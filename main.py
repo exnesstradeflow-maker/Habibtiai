@@ -34,46 +34,100 @@ LOG_BOT_TOKEN = os.getenv("LOG_BOT_TOKEN")
 PYCHARM_LOG_CHANNEL_ID = int(os.getenv("PYCHARM_LOG_CHANNEL_ID", 0))
 
 # =====================================================================
-# 2. DJANGO BAZASINI KOD ICHIDA SOZLASH (PAPKA SHART EMAS)
+# 2. LOGGING SOZLAMALARI
+# =====================================================================
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
+logger = logging.getLogger(__name__)
+
+# =====================================================================
+# 3. DJANGO LOYIHASINI TO'LIQ VEB-SERVER BILAN SOZLASH
 # =====================================================================
 import django
 from django.conf import settings
 from django.db import models
+from django.contrib import admin
+from django.core.wsgi import get_wsgi_application
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 if not settings.configured:
     settings.configure(
-        DEBUG=True,
+        DEBUG=True,  # Railway'da static fayllar oson ko'rinishi uchun
+        SECRET_KEY=os.getenv("DJANGO_SECRET_KEY", "railway-secret-key-12345"),
         DATABASES={
             'default': {
                 'ENGINE': 'django.db.backends.sqlite3',
-                'NAME': os.path.join(os.path.dirname(os.path.abspath(__file__)), 'db.sqlite3'),
+                'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
             }
         },
         INSTALLED_APPS=[
+            'django.contrib.admin',
+            'django.contrib.auth',
             'django.contrib.contenttypes',
-            '__main__',  # Modellar shu faylning o'zida ekanligini bildiradi
+            'django.contrib.sessions',
+            'django.contrib.messages',
+            'django.contrib.staticfiles',
+            '__main__',
         ],
+        ROOT_URLCONF='__main__',
+        MIDDLEWARE=[
+            'django.middleware.security.SecurityMiddleware',
+            'django.contrib.sessions.middleware.SessionMiddleware',
+            'django.middleware.common.CommonMiddleware',
+            'django.middleware.csrf.CsrfViewMiddleware',
+            'django.contrib.auth.middleware.AuthenticationMiddleware',
+            'django.contrib.messages.middleware.MessageMiddleware',
+            'django.middleware.clickjacking.XFrameOptionsMiddleware',
+        ],
+        TEMPLATES=[{
+            'BACKEND': 'django.template.backends.django.DjangoTemplates',
+            'APP_DIRS': True,
+            'OPTIONS': {
+                'context_processors': [
+                    'django.template.context_processors.debug',
+                    'django.template.context_processors.request',
+                    'django.contrib.auth.context_processors.auth',
+                    'django.contrib.messages.context_processors.messages',
+                ],
+            },
+        }],
+        STATIC_URL='/static/',
+        ALLOWED_HOSTS=['*'],
         TIME_ZONE='UTC',
         USE_TZ=True,
     )
     django.setup()
 
 # =====================================================================
-# 3. MA'LUMOTLAR BAZASI MODELLARI (JADVALLARI)
+# 4. MA'LUMOTLAR BAZASI MODELLARI
 # =====================================================================
 class BadWord(models.Model):
-    word = models.CharField(max_length=100, unique=True)
-    class Meta: app_label = '__main__'
+    word = models.CharField("Taqiqlangan so'z", max_length=100, unique=True)
+    def __str__(self): return self.word
+    class Meta: 
+        app_label = '__main__'
+        verbose_name = "Taqiqlangan so'z"
+        verbose_name_plural = "Taqiqlangan so'zlar"
 
 class UserWarning(models.Model):
-    user_id = models.BigIntegerField(primary_key=True)
-    count = models.IntegerField(default=0)
-    class Meta: app_label = '__main__'
+    user_id = models.BigIntegerField("Foydalanuvchi ID", primary_key=True)
+    count = models.IntegerField("Ogohlantirishlar soni", default=0)
+    class Meta: 
+        app_label = '__main__'
+        verbose_name = "Foydalanuvchi ogohlantirishi"
+        verbose_name_plural = "Foydalanuvchi ogohlantirishlari"
 
 class AdminViolation(models.Model):
-    user_id = models.BigIntegerField(primary_key=True)
-    count = models.IntegerField(default=0)
-    class Meta: app_label = '__main__'
+    user_id = models.BigIntegerField("Admin ID", primary_key=True)
+    count = models.IntegerField("Qoida buzish soni", default=0)
+    class Meta: 
+        app_label = '__main__'
+        verbose_name = "Admin xatosi"
+        verbose_name_plural = "Admin xatolari"
 
 class UserLink(models.Model):
     user_id = models.BigIntegerField(primary_key=True)
@@ -86,16 +140,41 @@ class InviteLink(models.Model):
     link = models.TextField()
     class Meta: app_label = '__main__'
 
-# Jadvallarni avtomatik yaratish (Migratsiyasiz ishlaydi!)
-from django.core.management import call_command
-django.setup()
+# Modellarni Django Adminga ro'yxatdan o'tkazish
+if not admin.site.is_registered(BadWord):
+    @admin.register(BadWord)
+    class BadWordAdmin(admin.ModelAdmin): list_display = ('word',)
+
+if not admin.site.is_registered(UserWarning):
+    @admin.register(UserWarning)
+    class UserWarningAdmin(admin.ModelAdmin): list_display = ('user_id', 'count')
+
+if not admin.site.is_registered(AdminViolation):
+    @admin.register(AdminViolation)
+    class AdminViolationAdmin(admin.ModelAdmin): list_display = ('user_id', 'count')
+
+# Jadvallarni avtomatik yaratish
 with django.db.connection.schema_editor() as schema_editor:
     for model in [BadWord, UserWarning, AdminViolation, UserLink, InviteLink]:
         if not model._meta.db_table in django.db.connection.introspection.table_names():
             schema_editor.create_model(model)
 
 # =====================================================================
-# 4. DJANGO ORM ASYNC FUNKSIYALARI
+# 5. DJANGO URLS SOZLAMASI (SAYT MANZILLARI)
+# =====================================================================
+from django.urls import path
+from django.http import HttpResponse
+
+def home_view(request):
+    return HttpResponse("<h2>🤖 Telegram Bot va Django Admin Panel muvaffaqiyatli ishlamoqda!</h2><p>Admin panelga kirish uchun <a href='/admin/'>bu yerga bosing</a>.</p>")
+
+urlpatterns = [
+    path('', home_view),
+    path('admin/', admin.site.urls),
+]
+
+# =====================================================================
+# 6. BAZA BILAN ISHLASH FUNKSIYALARI (ASYNC ORM)
 # =====================================================================
 @sync_to_async
 def check_bad_words_in_db(text: str) -> bool:
@@ -150,8 +229,14 @@ def get_invite_link(user_id: int):
 def set_invite_link(user_id: int, link: str):
     InviteLink.objects.update_or_create(user_id=user_id, defaults={'link': link})
 
+# Superuser (Admin) avtomatik yaratish (Agar bazada admin bo'lmasa)
+from django.contrib.auth.models import User
+if not User.objects.filter(username='admin').exists():
+    User.objects.create_superuser('admin', 'admin@example.com', 'admin777')
+    logger.info("🔐 Django Admin uchun profil yaratildi: Login: admin | Parol: admin777")
+
 # =====================================================================
-# 5. BOT IKKILAMCHI SOZLAMALARI VA LOGGING
+# 7. BOT SOZLAMALARI VA GLOBAL O'ZGARUVCHILAR
 # =====================================================================
 openai_client = OpenAI(api_key=OPENAI_API_KEY)
 bot = Bot(token=TELEGRAM_TOKEN)
@@ -164,25 +249,8 @@ user_to_support = {}
 support_to_user = {}
 waiting_support = set()
 
-class TelegramLogHandler(logging.Handler):
-    def emit(self, record):
-        log_entry = self.format(record)
-        if any(k in log_entry.lower() for k in ["retryafter", "badrequest", "flood control"]): return
-        safe_log = log_entry.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-        async def safe_send():
-            try:
-                await asyncio.sleep(1)
-                await log_bot.send_message(PYCHARM_LOG_CHANNEL_ID, f"🖥 <b>Terminal Log:</b>\n<pre>{safe_log}</pre>", parse_mode="HTML")
-            except Exception: pass
-        try: asyncio.create_task(safe_send())
-        except Exception: pass
-
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
-logger.addHandler(TelegramLogHandler())
-
 # =====================================================================
-# 6. YORDAMCHI FUNKSIYALAR VA FILTRLAR (OPENAI)
+# 8. FILTRLAR VA OPENAI
 # =====================================================================
 async def is_admin(chat_id: int, user_id: int) -> bool:
     try:
@@ -224,7 +292,35 @@ async def get_image_bytes(file_id: str) -> bytes | None:
     except Exception as e: logger.error(f"Rasm yuklashda xatolik: {e}"); return None
 
 # =====================================================================
-# 7. CAPTCHA GENERATOR
+# 9. JAZOLASH STRATEGIYASI
+# =====================================================================
+async def handle_admin_violation(message: types.Message, reason: str):
+    user_id = message.from_user.id
+    try: await message.delete()
+    except Exception: pass
+    count = await get_admin_violation(user_id) + 1; await set_admin_violation(user_id, count)
+    await send_private(user_id, f"⚠️ Admin qoida buzdi! {reason} ({count}/15)")
+    if count >= 15:
+        await send_log(f"🚨 Adminni o'chiring! ID: {user_id} 15 marta qoida buzdi.")
+        await set_admin_violation(user_id, 0)
+
+async def handle_user_penalty(message: types.Message, reason: str):
+    user_id = message.from_user.id; chat_id = message.chat.id
+    if await is_admin(chat_id, user_id): await handle_admin_violation(message, reason); return
+    try: await message.delete()
+    except Exception: pass
+    count = await get_warning(user_id) + 1; await set_warning(user_id, count)
+    if count >= 3:
+        try:
+            await bot.ban_chat_member(chat_id=chat_id, user_id=user_id)
+            await send_log(f"🚫 <b>BAN:</b> {message.from_user.first_name} ({reason})", user_id=user_id, unblock_button=True)
+            await set_warning(user_id, 0)
+        except Exception as e: logger.error(f"Ban xatolik: {e}")
+    else:
+        await send_private(user_id, f"⚠️ Ogohlantirish: {count}/3. Sabab: {reason}")
+
+# =====================================================================
+# 10. CAPTCHA TIZIMI
 # =====================================================================
 def create_image_captcha() -> tuple[bytes, str]:
     chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
@@ -257,35 +353,7 @@ async def send_captcha(user_id: int, user_name: str):
     except Exception as e: logger.error(f"Captcha yuborishda xatolik: {e}")
 
 # =====================================================================
-# 8. JAZOLASH STRATEGIYASI
-# =====================================================================
-async def handle_admin_violation(message: types.Message, reason: str):
-    user_id = message.from_user.id
-    try: await message.delete()
-    except Exception: pass
-    count = await get_admin_violation(user_id) + 1; await set_admin_violation(user_id, count)
-    await send_private(user_id, f"⚠️ Admin qoida buzdi! {reason} ({count}/15)")
-    if count >= 15:
-        await send_log(f"🚨 Adminni o'chiring! ID: {user_id} 15 marta qoida buzdi.")
-        await set_admin_violation(user_id, 0)
-
-async def handle_user_penalty(message: types.Message, reason: str):
-    user_id = message.from_user.id; chat_id = message.chat.id
-    if await is_admin(chat_id, user_id): await handle_admin_violation(message, reason); return
-    try: await message.delete()
-    except Exception: pass
-    count = await get_warning(user_id) + 1; await set_warning(user_id, count)
-    if count >= 3:
-        try:
-            await bot.ban_chat_member(chat_id=chat_id, user_id=user_id)
-            await send_log(f"🚫 <b>BAN:</b> {message.from_user.first_name} ({reason})", user_id=user_id, unblock_button=True)
-            await set_warning(user_id, 0)
-        except Exception as e: logger.error(f"Ban xatolik: {e}")
-    else:
-        await send_private(user_id, f"⚠️ Ogohlantirish: {count}/3. Sabab: {reason}")
-
-# =====================================================================
-# 9. AIOGRAM HANDLERS (BOT MANTIQI)
+# 11. AIOGRAM SCRIPTING HANDLERS
 # =====================================================================
 @dp.message(F.text == "/start")
 async def cmd_start(message: types.Message):
@@ -363,7 +431,7 @@ async def unblock_user(callback: CallbackQuery):
         await callback.answer("✅ Bajarildi")
     except Exception as e: logger.error(f"Unblock xatolik: {e}")
 
-# Guruh ichidagi xabarlarni filtrlash
+# Guruh xabarlari filtri
 @dp.message(F.chat.id == MAIN_CHAT_ID, F.text)
 async def check_text(message: types.Message):
     if await check_bad_words_in_db(message.text): await handle_user_penalty(message, reason="So'kinish")
@@ -391,9 +459,7 @@ async def check_media(message: types.Message):
 async def on_join_request(update: types.ChatJoinRequest):
     if update.chat.id == MAIN_CHAT_ID: await send_captcha(update.from_user.id, update.from_user.first_name)
 
-# =====================================================================
-# 10. USERBOT CAPTCHA JAVOBLARINI TEKSHIRISH
-# =====================================================================
+# Userbot handlerlari
 async def setup_userbot_handlers():
     @userbot.on(events.NewMessage(incoming=True, func=lambda e: e.is_private))
     async def on_captcha_reply(event):
@@ -411,13 +477,39 @@ async def setup_userbot_handlers():
             except Exception: pass
 
 # =====================================================================
-# MAIN ISHGA TUSHIRISH
+# 12. HAQIQIY DJANGO VEB SERVERNISH ISHGA TUSHIRISH (WSGI)
+# =====================================================================
+async def run_django_web_server():
+    import uvicorn
+    from django.core.asgi import get_asgi_application
+    
+    # Django-ni ASGI rejimiga o'tkazamiz
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "__main__")
+    asgi_app = get_asgi_application()
+    
+    port = int(os.getenv("PORT", 8080))
+    logger.info(f"🌍 Django Veb-Server {port}-portda yoqilmoqda...")
+    
+    # Uvicorn orqali veb-saytni ishga tushiramiz
+    config = uvicorn.Config(asgi_app, host="0.0.0.0", port=port, log_level="warning")
+    server = uvicorn.Server(config)
+    await server.serve()
+
+# =====================================================================
+# MAIN FUNCTION
 # =====================================================================
 async def main():
-    logger.info("🤖 LOYIHA ISHGA TUSHDI!")
+    logger.info("🚀 TIZIM ISHGA TUSHMOQDA...")
     await userbot.start()
     await setup_userbot_handlers()
-    await asyncio.gather(dp.start_polling(bot), userbot.run_until_disconnected())
+    logger.info("🤖 TELEGRAM BOT VA DJANGO ADMIN TAYYOR!")
+    
+    # Botlar va Django Veb-Saytini parallel yurgizamiz
+    await asyncio.gather(
+        dp.start_polling(bot), 
+        userbot.run_until_disconnected(),
+        run_django_web_server()
+    )
 
 if __name__ == "__main__":
     asyncio.run(main())
