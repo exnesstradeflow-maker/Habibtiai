@@ -44,7 +44,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # =====================================================================
-# 3. DJANGO LOYIHASINI TO'LIQ VEB-SERVER BILAN SOZLASH
+# 3. DJANGO LOYIHASINI CHIROYLI DIZAYN BILAN SOZLASH
 # =====================================================================
 import django
 from django.conf import settings
@@ -64,6 +64,7 @@ if not settings.configured:
             }
         },
         INSTALLED_APPS=[
+            'jazzmin',  # 🌟 JAZZMIN DIZAYNI (Har doim django.contrib.admin'dan tepada turishi kerak!)
             'django.contrib.admin',
             'django.contrib.auth',
             'django.contrib.contenttypes',
@@ -96,8 +97,66 @@ if not settings.configured:
         }],
         STATIC_URL='/static/',
         ALLOWED_HOSTS=['*'],
-        TIME_ZONE='UTC',
+        TIME_ZONE='Asia/Tashkent',
         USE_TZ=True,
+        
+        # 🎨 JAZZMIN INTERFEYS SOZLAMALARI
+        JAZZMIN_SETTINGS={
+            "site_title": "Bot Admin Paneli",
+            "site_header": "Bot boshqaruvi",
+            "site_brand": "🤖 Cyber Bot",
+            "welcome_sign": "Tizim boshqaruv paneliga xush kelibsiz!",
+            "copyright": "Cyber Bot Inc",
+            "search_model": ["auth.User", "__main__.BadWord"],
+            "user_avatar": None,
+            "topmenu_links": [
+                {"name": "Bosh sahifa", "url": "admin:index", "permissions": ["auth.view_user"]},
+                {"name": "Yordam", "url": "https://t.me/uz_python", "new_window": True},
+            ],
+            "show_sidebar": True,
+            "navigation_expanded": True,
+            "icons": {
+                "auth": "fas fa-users-cog",
+                "auth.user": "fas fa-user",
+                "auth.Group": "fas fa-users",
+                "__main__.BadWord": "fas fa-comment-slash",
+                "__main__.UserWarning": "fas fa-exclamation-triangle",
+                "__main__.AdminViolation": "fas fa-user-shield",
+            },
+            "order_with_respect_to": ["__main__.BadWord", "__main__.UserWarning", "__main__.AdminViolation", "auth"],
+        },
+        # ✨ DIZAYN MAVZUSI (Dark mode va Ranglar uyg'unligi)
+        JAZZMIN_UI_TWEAKS={
+            "navbar_small_text": False,
+            "footer_small_text": False,
+            "body_small_text": False,
+            "brand_small_text": False,
+            "brand_colour": "navbar-dark",
+            "accent": "accent-primary",
+            "navbar": "navbar-dark bg-dark",
+            "no_navbar_border": False,
+            "navbar_fixed": False,
+            "layout_fixed": False,
+            "footer_fixed": False,
+            "sidebar_fixed": False,
+            "sidebar": "sidebar-dark-primary",
+            "sidebar_nav_small_text": False,
+            "sidebar_disable_expand": False,
+            "sidebar_nav_child_indent": True,
+            "sidebar_nav_compact_style": False,
+            "sidebar_nav_legacy_style": False,
+            "sidebar_nav_flat_style": False,
+            "theme": "darkly",  # 🕶️ Zamonaviy to'q qora (Dark) mavzu
+            "dark_mode_theme": None,
+            "button_classes": {
+                "primary": "btn-primary",
+                "secondary": "btn-secondary",
+                "info": "btn-info",
+                "warning": "btn-warning",
+                "danger": "btn-danger",
+                "success": "btn-success"
+            }
+        }
     )
     django.setup()
 
@@ -110,7 +169,7 @@ class BadWord(models.Model):
     class Meta: 
         app_label = '__main__'
         verbose_name = "Taqiqlangan so'z"
-        verbose_name_plural = "Taqiqlangan so'zlar"
+        verbose_name_plural = "🚫 Taqiqlangan so'zlar"
 
 class UserWarning(models.Model):
     user_id = models.BigIntegerField("Foydalanuvchi ID", primary_key=True)
@@ -118,7 +177,7 @@ class UserWarning(models.Model):
     class Meta: 
         app_label = '__main__'
         verbose_name = "Foydalanuvchi ogohlantirishi"
-        verbose_name_plural = "Foydalanuvchi ogohlantirishlari"
+        verbose_name_plural = "⚠️ Foydalanuvchi ogohlantirishlari"
 
 class AdminViolation(models.Model):
     user_id = models.BigIntegerField("Admin ID", primary_key=True)
@@ -126,7 +185,7 @@ class AdminViolation(models.Model):
     class Meta: 
         app_label = '__main__'
         verbose_name = "Admin xatosi"
-        verbose_name_plural = "Admin xatolari"
+        verbose_name_plural = "👮 Admin xatolari"
 
 class UserLink(models.Model):
     user_id = models.BigIntegerField(primary_key=True)
@@ -142,46 +201,47 @@ class InviteLink(models.Model):
 # Modellarni Django Adminga ro'yxatdan o'tkazish
 if not admin.site.is_registered(BadWord):
     @admin.register(BadWord)
-    class BadWordAdmin(admin.ModelAdmin): list_display = ('word',)
+    class BadWordAdmin(admin.ModelAdmin): 
+        list_display = ('word',)
+        search_fields = ('word',)
 
 if not admin.site.is_registered(UserWarning):
     @admin.register(UserWarning)
-    class UserWarningAdmin(admin.ModelAdmin): list_display = ('user_id', 'count')
+    class UserWarningAdmin(admin.ModelAdmin): 
+        list_display = ('user_id', 'count')
+        search_fields = ('user_id',)
 
 if not admin.site.is_registered(AdminViolation):
     @admin.register(AdminViolation)
-    class AdminViolationAdmin(admin.ModelAdmin): list_display = ('user_id', 'count')
+    class AdminViolationAdmin(admin.ModelAdmin): 
+        list_display = ('user_id', 'count')
+        search_fields = ('user_id',)
 
 # =====================================================================
-# KOD ICHIDAN AVTOMATIK MIGRATSIYA VA SUPERUSER YARATISH (TO'G'RILANDI)
+# KOD ICHIDAN AVTOMATIK MIGRATSIYA VA SUPERUSER YARATISH
 # =====================================================================
 def run_db_initialization():
     from django.core.management import call_command
     from django.contrib.auth.models import User
     
-    # 1-QADAM: Avval bazada jadvallarni mutlaqo muammosiz yaratib olamiz
+    db_path = os.path.join(BASE_DIR, 'db.sqlite3')
+    
     try:
-        logger.info("⚙️ Ma'lumotlar bazasi jadvallari tekshirilmoqda va migratsiya qilinmoqda...")
+        logger.info("⚙️ Ma'lumotlar bazasi jadvallari tekshirilmoqda...")
         call_command('migrate', interactive=False)
-        logger.info("✅ Migratsiya muvaffaqiyatli bajarildi!")
+        logger.info("✅ Migratsiya muvaffaqiyatli yakunlandi!")
     except Exception as e:
         logger.error(f"❌ Migratsiya qilishda xatolik: {e}")
         return
 
-    # 2-QADAM: Jadvallar to'liq tayyor bo'lgandan keyingina admin profilini tekshiramiz/yangilaymiz
     try:
-        admin_user = User.objects.filter(username='admin').first()
-        if not admin_user:
-            User.objects.create_superuser('admin', 'admin@example.com', 'admin777')
-            logger.info("🔐 Django Admin uchun yangi profil yaratildi: Login: admin | Parol: admin777")
-        else:
-            admin_user.set_password('admin777')
-            admin_user.save()
-            logger.info("🔐 Django Admin paroli yangilandi: admin777")
+        # Eski profilni tozalab yangilaymiz
+        User.objects.filter(username='admin').delete()
+        User.objects.create_superuser('admin', 'admin@example.com', 'admin777')
+        logger.info("🔐 Django Admin profili o'rnatildi! Login: admin | Parol: admin777")
     except Exception as e:
         logger.error(f"❌ Admin profil yaratishda xatolik: {e}")
 
-# Bazani ishga tushirish funksiyasini chaqiramiz
 run_db_initialization()
 
 # =====================================================================
