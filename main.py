@@ -54,6 +54,9 @@ from django.contrib import admin
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 if not settings.configured:
+    # Railway domenini aniqlash (agar bo'lmasa eski domen zaxira sifatida turadi)
+    public_domain = os.getenv("RAILWAY_PUBLIC_DOMAIN", "worker-production-1a55.up.railway.app")
+    
     settings.configure(
         DEBUG=True,  
         SECRET_KEY=os.getenv("DJANGO_SECRET_KEY", "railway-secret-key-12345"),
@@ -97,6 +100,14 @@ if not settings.configured:
         }],
         STATIC_URL='/static/',
         ALLOWED_HOSTS=['*'],
+        
+        # 🔒 CSRF Xatoligini oldini olish uchun ishonchli domenlar ro'yxati
+        CSRF_TRUSTED_ORIGINS=[
+            f"https://{public_domain}",
+            "http://localhost:8080",
+            "http://127.0.0.1:8080"
+        ],
+        
         TIME_ZONE='Asia/Tashkent',
         USE_TZ=True,
         
