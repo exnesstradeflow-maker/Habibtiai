@@ -370,7 +370,7 @@ def premium_dashboard(request):
         "violations": AdminViolation.objects.count(),
     }
 
-    html = f"""
+    html = """
     <!DOCTYPE html>
     <html>
     <head>
