@@ -614,7 +614,14 @@ def premium_dashboard(request):
     </html>
     """
 
-    return HttpResponse(html)
+    return HttpResponse(
+    html.format(
+        users=stats['users'],
+        bad_words=stats['bad_words'],
+        warnings=stats['warnings'],
+        violations=stats['violations']
+    )
+)
 
 
 
