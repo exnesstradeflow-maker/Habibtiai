@@ -50,7 +50,6 @@ import django
 from django.conf import settings
 from django.db import models
 from django.contrib import admin
-from django.core.management import call_command
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -154,23 +153,36 @@ if not admin.site.is_registered(AdminViolation):
     class AdminViolationAdmin(admin.ModelAdmin): list_display = ('user_id', 'count')
 
 # =====================================================================
-# KOD ICHIDAN AVTOMATIK MIGRATSIYA VA SUPERUSER YARATISH
+# KOD ICHIDAN AVTOMATIK MIGRATSIYA VA SUPERUSER YARATISH (TO'G'RILANDI)
 # =====================================================================
-try:
-    logger.info("⚙️ Ma'lumotlar bazasi jadvallari tekshirilmoqda va migratsiya qilinmoqda...")
-    call_command('migrate', interactive=False)
-    logger.info("✅ Migratsiya muvaffaqiyatli bajarildi!")
-except Exception as e:
-    logger.error(f"❌ Migratsiya qilishda xatolik: {e}")
+def run_db_initialization():
+    from django.core.management import call_command
+    from django.contrib.auth.models import User
+    
+    # 1-QADAM: Avval bazada jadvallarni mutlaqo muammosiz yaratib olamiz
+    try:
+        logger.info("⚙️ Ma'lumotlar bazasi jadvallari tekshirilmoqda va migratsiya qilinmoqda...")
+        call_command('migrate', interactive=False)
+        logger.info("✅ Migratsiya muvaffaqiyatli bajarildi!")
+    except Exception as e:
+        logger.error(f"❌ Migratsiya qilishda xatolik: {e}")
+        return
 
-# Superuser (Admin) yaratish (Agar bazada admin bo'lmasa)
-from django.contrib.auth.models import User
-try:
-    if not User.objects.filter(username='admin').exists():
-        User.objects.create_superuser('admin', 'admin@example.com', 'admin777')
-        logger.info("🔐 Django Admin uchun yangi profil yaratildi: Login: admin | Parol: admin777")
-except Exception as e:
-    logger.error(f"❌ Admin profil yaratishda xatolik: {e}")
+    # 2-QADAM: Jadvallar to'liq tayyor bo'lgandan keyingina admin profilini tekshiramiz/yangilaymiz
+    try:
+        admin_user = User.objects.filter(username='admin').first()
+        if not admin_user:
+            User.objects.create_superuser('admin', 'admin@example.com', 'admin777')
+            logger.info("🔐 Django Admin uchun yangi profil yaratildi: Login: admin | Parol: admin777")
+        else:
+            admin_user.set_password('admin777')
+            admin_user.save()
+            logger.info("🔐 Django Admin paroli yangilandi: admin777")
+    except Exception as e:
+        logger.error(f"❌ Admin profil yaratishda xatolik: {e}")
+
+# Bazani ishga tushirish funksiyasini chaqiramiz
+run_db_initialization()
 
 # =====================================================================
 # 5. DJANGO URLS SOZLAMASI (SAYT MANZILLARI)
