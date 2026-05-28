@@ -44,7 +44,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # =====================================================================
-# 3. DJANGO LOYIHASINI LUXURY DARK/GOLD DIZAYN BILAN SOZLASH
+# 3. DJANGO LOYIHASINI LUXURY DARK/GOLD DIZAYN VA TARJIMASI BILAN SOZLASH
 # =====================================================================
 import django
 from django.conf import settings
@@ -66,7 +66,7 @@ if not settings.configured:
             }
         },
         INSTALLED_APPS=[
-            'jazzmin',  # 🌟 JAZZMIN DIZAYNI
+            'jazzmin',  # 🌟 JAZZMIN LUXURY DIZAYNI
             'django.contrib.admin',
             'django.contrib.auth',
             'django.contrib.contenttypes',
@@ -109,13 +109,13 @@ if not settings.configured:
         TIME_ZONE='Asia/Tashkent',
         USE_TZ=True,
         
-        # 🎨 JAZZMIN INTERFEYS SOZLAMALARI (Premium Oltin va To'q ranglar uyg'unligi)
+        # 🎨 JAZZMIN INTERFEYS SOZLAMALARI (Mafia Habibiti Premium Oltin va To'q ranglar uyg'unligi)
         JAZZMIN_SETTINGS={
-            "site_title": "Stars Shop Admin",
-            "site_header": "Samir",
-            "site_brand": "🌟 Stars Shop",
-            "welcome_sign": "Samir boshqaruv paneliga xush kelibsiz!",
-            "copyright": "Samir Inc",
+            "site_title": "Mafia Habibiti Admin Panel",
+            "site_header": "Mafia Habibiti",
+            "site_brand": "⚜ Mafia Habibiti",
+            "welcome_sign": "Mafia Habibiti Boshqaruv Paneliga Xush Kelibsiz! / Добро пожаловать в панель управления!",
+            "copyright": "Mafia Habibiti Inc",
             "search_model": ["auth.User", "__main__.BadWord"],
             "show_sidebar": True,
             "navigation_expanded": True,
@@ -130,14 +130,14 @@ if not settings.configured:
             "order_with_respect_to": ["__main__.BadWord", "__main__.UserWarning", "__main__.AdminViolation", "auth"],
         },
         
-        # ✨ SAFIYA STARS WEBAPP USLUBIDAGI DESIGN INTERFEYSI
+        # ✨ PREMIUM DIZAYN INTERFEYS SOZLAMALARI
         JAZZMIN_UI_TWEAKS={
-            "theme": "solar",  # Asosiy to'q ranglar sxemasi
+            "theme": "solar",  
             "navbar": "navbar-dark bg-dark",
-            "sidebar": "sidebar-dark-warning", # Sidebar urg'usi oltin/sariq rangda
-            "accent": "accent-warning",        # Faol elementlar oltin rangda
+            "sidebar": "sidebar-dark-warning", 
+            "accent": "accent-warning",        
             "button_classes": {
-                "primary": "btn-warning text-dark font-weight-bold", # Tugmalar oltin rangda
+                "primary": "btn-warning text-dark font-weight-bold", 
                 "secondary": "btn-outline-light",
                 "info": "btn-info",
                 "warning": "btn-warning",
@@ -149,110 +149,126 @@ if not settings.configured:
     django.setup()
 
 # =====================================================================
-# 🎨 CUSTOM STYLES: WEBAPP'DAGI KO'RINISH VA SHAKLLARNI INTEGRATSIYA QILISH
+# 🎨 MAFIA HABIBITI CUSTOM STYLE INJECTION (REACT UI DIZAYNI INTERGATSIYASI)
 # =====================================================================
-# Django admin panel yuklanganda webapp'ingizdagi qora-oltin fonlar, radiuslar va neon effektlarni inject qilamiz
-from django.contrib.auth.signals import user_logged_in
-from django.dispatch import receiver
-
-# Jazzmin o'zining ichki CSS'ini o'zgartirish imkonini beradi. 
-# Quyidagi kod orqali admin panel dizaynini to'liq o'sha shaklga keltiramiz:
-from django.template.response import TemplateResponse
-
-# Admin paneldagi bloklarni "Luxury Card" ko'rinishiga o'tkazish uchun global stil injection
 def custom_admin_styles():
     css_code = """
     <style>
-        /* Webapp qora foni va oltin urg'ulari */
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Rajdhani:wght@500;700&display=swap');
+
+        /* Webapp premium qora foni va oltin urg'ulari */
         body, .content-wrapper, .main-footer {
-            background-color: #0b0c10 !important;
-            color: #f1f1f1 !important;
-            font-family: 'Inter', sans-serif !important;
+            background-color: #080a0f !important;
+            color: #e8e0d0 !important;
+            font-family: 'Rajdhani', sans-serif !important;
         }
-        /* Karta va bloklarning yumaloq shakli (Siz yuborgan html dagi border-radius va neon glow) */
+        
+        /* Karta va bloklarning silliq yumaloq shakli (Glow va Blur effekti) */
         .card, .info-box, .content, .main-sidebar {
-            background: rgba(20, 22, 31, 0.65) !important;
-            backdrop-filter: blur(10px) !important;
-            border: 1px solid rgba(255, 215, 0, 0.15) !important;
-            border-radius: 16px !important; /* Shakli silliq va yumaloq */
-            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5) !important;
+            background: rgba(20, 24, 35, 0.85) !important;
+            backdrop-filter: blur(20px) !important;
+            border: 1px solid rgba(255, 215, 0, 0.13) !important;
+            border-radius: 14px !important;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5) !important;
             transition: all 0.3s ease-in-out;
         }
-        /* Hover effektida oltin neon porlashi */
+        
+        /* Neon oltin porlashi hover bo'lganda */
         .card:hover, .info-box:hover {
             border-color: #ffd700 !important;
-            box-shadow: 0 6px 25px rgba(255, 215, 0, 0.15) !important;
+            box-shadow: 0 8px 25px rgba(255, 215, 0, 0.2) !important;
         }
-        /* Navigatsiya va jadvallar */
+        
+        /* Sarlavhalar uchun Cinzel premium shrifti */
+        .brand-text, .content-header h1, .login-box-msg {
+            font-family: 'Cinzel', serif !important;
+            color: #ffd700 !important;
+            text-shadow: 0 0 20px rgba(255, 215, 0, 0.4) !important;
+            letter-spacing: 0.08em;
+        }
+        
+        /* Navigatsiya va Oltin Gradiantli Tugmalar */
         .nav-sidebar .nav-link.active, .btn-primary, .bg-warning {
             background: linear-gradient(135deg, #ffd700 0%, #b8860b 100%) !important;
             color: #000 !important;
             border-radius: 10px !important;
-            font-weight: 600 !important;
+            font-weight: 700 !important;
+            text-transform: uppercase;
             border: none !important;
         }
+        
+        .btn-primary:hover {
+            box-shadow: 0 6px 20px rgba(255, 215, 0, 0.3) !important;
+            transform: translateY(-1px);
+        }
+        
+        /* Jadvallar va ma'lumotlar */
         .table, .table th, .table td {
-            border-color: rgba(255, 215, 0, 0.08) !important;
-            color: #e0e0e0 !important;
+            border-color: rgba(255, 215, 0, 0.04) !important;
+            color: #e8e0d0 !important;
         }
         .table thead th {
             background-color: rgba(255, 215, 0, 0.05) !important;
             color: #ffd700 !important;
+            font-size: 0.75rem !important;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
         }
-        /* To'q rangli input va forma shakllari */
+        
+        /* Kiritish maydonlari (Input) */
         .form-control, .select2-container--default .select2-selection--single {
-            background-color: #1a1c23 !important;
-            border: 1px solid rgba(255, 215, 0, 0.2) !important;
-            color: #fff !important;
-            border-radius: 8px !important;
+            background-color: rgba(255, 255, 255, 0.04) !important;
+            border: 1px solid rgba(255, 215, 0, 0.13) !important;
+            color: #e8e0d0 !important;
+            border-radius: 10px !important;
         }
         .form-control:focus {
             border-color: #ffd700 !important;
-            box-shadow: 0 0 8px rgba(255, 215, 0, 0.3) !important;
+            box-shadow: 0 0 0 3px rgba(255, 215, 0, 0.1) !important;
         }
-        /* Brending logotipi */
-        .brand-link {
-            border-bottom: 1px solid rgba(255, 215, 0, 0.2) !important;
-        }
-        .brand-text {
-            color: #ffd700 !important;
-            font-weight: 700 !important;
-            letter-spacing: 1px;
-        }
+        
+        /* Scrollbar dizayni */
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: #0e1118; }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 215, 0, 0.2); border-radius: 4px; }
     </style>
     """
     return css_code
 
-# Base admin shabloniga cssni ulaymiz
-admin.site.site_header = "Samir"
-admin.site.index_title = "Boshqaruv"
+admin.site.site_header = "⚜ Mafia Habibiti"
+admin.site.index_title = "Панель управления / Boshqaruv paneli"
 
 # =====================================================================
-# 4. MA'LUMOTLAR BAZASI MODELLARI
+# 4. MA'LUMOTLAR BAZASI MODELLARI VA TARJIMASI (UZ/RU YANGILANDI)
 # =====================================================================
 class BadWord(models.Model):
-    word = models.CharField("Taqiqlangan so'z", max_length=100, unique=True)
-    def __str__(self): return self.word
+    word = models.CharField("Taqiqlangan so'z / Запрещённое слово", max_length=100, unique=True)
+    
+    def __str__(self): 
+        return self.word
+        
     class Meta: 
         app_label = '__main__'
-        verbose_name = "Taqiqlangan so'z"
-        verbose_name_plural = "🚫 Taqiqlangan so'zlar"
+        verbose_name = "Taqiqlangan so'z / Запрещённое слово"
+        verbose_name_plural = "🚫 Taqiqlangan so'zlar / Запрещённые слова"
 
 class UserWarning(models.Model):
-    user_id = models.BigIntegerField("Foydalanuvchi ID", primary_key=True)
-    count = models.IntegerField("Ogohlantirishlar soni", default=0)
+    user_id = models.BigIntegerField("Foydalanuvchi ID / ID пользователя", primary_key=True)
+    count = models.IntegerField("Ogohlantirishlar soni / Кол-во предупреждений", default=0)
+    
     class Meta: 
         app_label = '__main__'
-        verbose_name = "Foydalanuvchi ogohlantirishi"
-        verbose_name_plural = "⚠️ Foydalanuvchi ogohlantirishlari"
+        verbose_name = "Foydalanuvchi ogohlantirishi / Предупреждение пользователя"
+        verbose_name_plural = "⚠️ Ogohlantirishlar / Предупреждения"
 
 class AdminViolation(models.Model):
-    user_id = models.BigIntegerField("Admin ID", primary_key=True)
-    count = models.IntegerField("Qoida buzish soni", default=0)
+    user_id = models.BigIntegerField("Admin ID / ID админа", primary_key=True)
+    count = models.IntegerField("Qoida buzish soni / Кол-во нарушений", default=0)
+    
     class Meta: 
         app_label = '__main__'
-        verbose_name = "Admin xatosi"
-        verbose_name_plural = "👮 Admin xatolari"
+        verbose_name = "Admin xatosi / Нарушение админа"
+        verbose_name_plural = "👮 Admin xatolari / Нарушения админов"
 
 class UserLink(models.Model):
     user_id = models.BigIntegerField(primary_key=True)
@@ -265,7 +281,7 @@ class InviteLink(models.Model):
     link = models.TextField()
     class Meta: app_label = '__main__'
 
-# Modellarni ro'yxatdan o'tkazish
+# Modellarni admin paneldagi ko'rinish jadvallarini sozlash
 if not admin.site.is_registered(BadWord):
     @admin.register(BadWord)
     class BadWordAdmin(admin.ModelAdmin): 
@@ -323,12 +339,15 @@ from django.http import HttpResponse
 def home_view(request):
     html_content = f"""
     <html>
-    <head>{custom_admin_styles()}</head>
+    <head>
+        <title>⚜ Mafia Habibiti</title>
+        {custom_admin_styles()}
+    </head>
     <body style="display:flex; flex-direction:column; justify-content:center; align-items:center; height:100vh;">
         <div class="card" style="padding:40px; text-align:center; max-width:500px;">
-            <h2 style="color:#ffd700; margin-bottom:20px;">🤖 Samir Bot & Admin Panel</h2>
-            <p style="color:#ccc; margin-bottom:30px;">Tizim va ma'lumotlar bazasi muvaffaqiyatli ulangan, premium dizayn faollashtirilgan!</p>
-            <a href="/admin/" class="btn-primary" style="padding:12px 25px; text-decoration:none; display:inline-block;">Admin panelga o'tish</a>
+            <h2 style="font-family:'Cinzel', serif; color:#ffd700; margin-bottom:20px;">⚜ Mafia Habibiti</h2>
+            <p style="color:#7a7060; margin-bottom:30px;">Tizim va ma'lumotlar bazasi muvaffaqiyatli ulangan, premium dizayn faollashtirilgan!</p>
+            <a href="/admin/" class="btn-primary" style="padding:12px 25px; text-decoration:none; display:inline-block;">Boshqaruv Paneliga O'tish</a>
         </div>
     </body>
     </html>
@@ -340,9 +359,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
 ]
 
-# Shuningdek, dizayn har bir admin sahifasida ishlashi uchun unga xavfsiz inject qilamiz
 admin.site.index_template = "admin/index.html"
-# Jazzmin context orqali o'z stilimizni sahifa yuqorisiga ulashni ta'minlaydi
 
 # =====================================================================
 # 6. BAZA BILAN ISHLASH FUNKSIYALARI (ASYNC ORM)
@@ -518,7 +535,7 @@ async def send_captcha(user_id: int, user_name: str):
     except Exception as e: logger.error(f"Captcha yuborishda xatolik: {e}")
 
 # =====================================================================
-# 11. AIOGRAM SCRIPTING HANDLERS
+# 11. AIOGRAM HANDLERS
 # =====================================================================
 @dp.message(F.text == "/start")
 async def cmd_start(message: types.Message):
