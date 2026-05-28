@@ -54,7 +54,6 @@ from django.contrib import admin
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 if not settings.configured:
-    # Railway domenini aniqlash (agar bo'lmasa eski domen zaxira sifatida turadi)
     public_domain = os.getenv("RAILWAY_PUBLIC_DOMAIN", "worker-production-1a55.up.railway.app")
     
     settings.configure(
@@ -67,7 +66,7 @@ if not settings.configured:
             }
         },
         INSTALLED_APPS=[
-            'jazzmin',  # 🌟 JAZZMIN DIZAYNI (Har doim django.contrib.admin'dan tepada turishi kerak!)
+            'jazzmin',  # 🌟 JAZZMIN DIZAYNI (Har doim eng tepada turishi shart)
             'django.contrib.admin',
             'django.contrib.auth',
             'django.contrib.contenttypes',
@@ -101,7 +100,6 @@ if not settings.configured:
         STATIC_URL='/static/',
         ALLOWED_HOSTS=['*'],
         
-        # 🔒 CSRF Xatoligini oldini olish uchun ishonchli domenlar ro'yxati
         CSRF_TRUSTED_ORIGINS=[
             f"https://{public_domain}",
             "http://localhost:8080",
@@ -114,16 +112,11 @@ if not settings.configured:
         # 🎨 JAZZMIN INTERFEYS SOZLAMALARI
         JAZZMIN_SETTINGS={
             "site_title": "Bot Admin Paneli",
-            "site_header": "Bot boshqaruvi",
+            "site_header": "Cyber Bot",
             "site_brand": "🤖 Cyber Bot",
             "welcome_sign": "Tizim boshqaruv paneliga xush kelibsiz!",
             "copyright": "Cyber Bot Inc",
             "search_model": ["auth.User", "__main__.BadWord"],
-            "user_avatar": None,
-            "topmenu_links": [
-                {"name": "Bosh sahifa", "url": "admin:index", "permissions": ["auth.view_user"]},
-                {"name": "Yordam", "url": "https://t.me/uz_python", "new_window": True},
-            ],
             "show_sidebar": True,
             "navigation_expanded": True,
             "icons": {
@@ -138,27 +131,10 @@ if not settings.configured:
         },
         # ✨ DIZAYN MAVZUSI (Dark mode va Ranglar uyg'unligi)
         JAZZMIN_UI_TWEAKS={
-            "navbar_small_text": False,
-            "footer_small_text": False,
-            "body_small_text": False,
-            "brand_small_text": False,
-            "brand_colour": "navbar-dark",
-            "accent": "accent-primary",
+            "theme": "darkly",  # 🕶️ Zamonaviy to'q qora (Dark) tema
             "navbar": "navbar-dark bg-dark",
-            "no_navbar_border": False,
-            "navbar_fixed": False,
-            "layout_fixed": False,
-            "footer_fixed": False,
-            "sidebar_fixed": False,
             "sidebar": "sidebar-dark-primary",
-            "sidebar_nav_small_text": False,
-            "sidebar_disable_expand": False,
-            "sidebar_nav_child_indent": True,
-            "sidebar_nav_compact_style": False,
-            "sidebar_nav_legacy_style": False,
-            "sidebar_nav_flat_style": False,
-            "theme": "darkly",  # 🕶️ Zamonaviy to'q qora (Dark) mavzu
-            "dark_mode_theme": None,
+            "accent": "accent-primary",
             "button_classes": {
                 "primary": "btn-primary",
                 "secondary": "btn-secondary",
@@ -229,31 +205,63 @@ if not admin.site.is_registered(AdminViolation):
         search_fields = ('user_id',)
 
 # =====================================================================
-# KOD ICHIDAN AVTOMATIK MIGRATSIYA VA SUPERUSER YARATISH
+# 🛠️ JADVAL YETIŞMOVCHILIGI XATOSINI TUZATISH (RAW SQL MIGRATION)
 # =====================================================================
-def run_db_initialization():
+def fix_missing_tables():
+    from django.db import connection
     from django.core.management import call_command
     from django.contrib.auth.models import User
     
-    db_path = os.path.join(BASE_DIR, 'db.sqlite3')
-    
+    # Avval standart Django jadvallarini yaratamiz
     try:
-        logger.info("⚙️ Ma'lumotlar bazasi jadvallari tekshirilmoqda...")
         call_command('migrate', interactive=False)
-        logger.info("✅ Migratsiya muvaffaqiyatli yakunlandi!")
     except Exception as e:
-        logger.error(f"❌ Migratsiya qilishda xatolik: {e}")
-        return
+        logger.error(f"Migrate xatolik: {e}")
 
+    # Bitta fayl ichidagi maxsus jadvallarni qo'lda SQL orqali tekshirib yaratamiz
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS __main___badword (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                word VARCHAR(100) NOT NULL UNIQUE
+            );
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS __main___userwarning (
+                user_id BIGINT PRIMARY KEY,
+                count INTEGER NOT NULL DEFAULT 0
+            );
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS __main___adminviolation (
+                user_id BIGINT PRIMARY KEY,
+                count INTEGER NOT NULL DEFAULT 0
+            );
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS __main___userlink (
+                user_id BIGINT PRIMARY KEY,
+                link TEXT NOT NULL,
+                log_msg_id BIGINT NOT NULL
+            );
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS __main___invitelink (
+                user_id BIGINT PRIMARY KEY,
+                link TEXT NOT NULL
+            );
+        """)
+    logger.info("✅ Barcha maxsus jadvallar muvaffaqiyatli tekshirildi va ochildi!")
+
+    # Superuser yaratish
     try:
-        # Eski profilni tozalab yangilaymiz
         User.objects.filter(username='admin').delete()
         User.objects.create_superuser('admin', 'admin@example.com', 'admin777')
-        logger.info("🔐 Django Admin profili o'rnatildi! Login: admin | Parol: admin777")
+        logger.info("🔐 Django Admin yangilandi. Login: admin | Parol: admin777")
     except Exception as e:
-        logger.error(f"❌ Admin profil yaratishda xatolik: {e}")
+        logger.error(f"Admin yaratishda xatolik: {e}")
 
-run_db_initialization()
+fix_missing_tables()
 
 # =====================================================================
 # 5. DJANGO URLS SOZLAMASI (SAYT MANZILLARI)
@@ -521,7 +529,6 @@ async def unblock_user(callback: CallbackQuery):
         await callback.answer("✅ Bajarildi")
     except Exception as e: logger.error(f"Unblock xatolik: {e}")
 
-# Guruh xabarlari filtri
 @dp.message(F.chat.id == MAIN_CHAT_ID, F.text)
 async def check_text(message: types.Message):
     if await check_bad_words_in_db(message.text): await handle_user_penalty(message, reason="So'kinish")
@@ -549,7 +556,6 @@ async def check_media(message: types.Message):
 async def on_join_request(update: types.ChatJoinRequest):
     if update.chat.id == MAIN_CHAT_ID: await send_captcha(update.from_user.id, update.from_user.first_name)
 
-# Userbot handlerlari
 async def setup_userbot_handlers():
     @userbot.on(events.NewMessage(incoming=True, func=lambda e: e.is_private))
     async def on_captcha_reply(event):
