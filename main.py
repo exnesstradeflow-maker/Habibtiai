@@ -50,13 +50,13 @@ import django
 from django.conf import settings
 from django.db import models
 from django.contrib import admin
-from django.core.wsgi import get_wsgi_application
+from django.core.management import call_command
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 if not settings.configured:
     settings.configure(
-        DEBUG=True,  # Railway'da static fayllar oson ko'rinishi uchun
+        DEBUG=True,  
         SECRET_KEY=os.getenv("DJANGO_SECRET_KEY", "railway-secret-key-12345"),
         DATABASES={
             'default': {
@@ -153,11 +153,24 @@ if not admin.site.is_registered(AdminViolation):
     @admin.register(AdminViolation)
     class AdminViolationAdmin(admin.ModelAdmin): list_display = ('user_id', 'count')
 
-# Jadvallarni avtomatik yaratish
-with django.db.connection.schema_editor() as schema_editor:
-    for model in [BadWord, UserWarning, AdminViolation, UserLink, InviteLink]:
-        if not model._meta.db_table in django.db.connection.introspection.table_names():
-            schema_editor.create_model(model)
+# =====================================================================
+# KOD ICHIDAN AVTOMATIK MIGRATSIYA VA SUPERUSER YARATISH
+# =====================================================================
+try:
+    logger.info("⚙️ Ma'lumotlar bazasi jadvallari tekshirilmoqda va migratsiya qilinmoqda...")
+    call_command('migrate', interactive=False)
+    logger.info("✅ Migratsiya muvaffaqiyatli bajarildi!")
+except Exception as e:
+    logger.error(f"❌ Migratsiya qilishda xatolik: {e}")
+
+# Superuser (Admin) yaratish (Agar bazada admin bo'lmasa)
+from django.contrib.auth.models import User
+try:
+    if not User.objects.filter(username='admin').exists():
+        User.objects.create_superuser('admin', 'admin@example.com', 'admin777')
+        logger.info("🔐 Django Admin uchun yangi profil yaratildi: Login: admin | Parol: admin777")
+except Exception as e:
+    logger.error(f"❌ Admin profil yaratishda xatolik: {e}")
 
 # =====================================================================
 # 5. DJANGO URLS SOZLAMASI (SAYT MANZILLARI)
@@ -229,14 +242,8 @@ def get_invite_link(user_id: int):
 def set_invite_link(user_id: int, link: str):
     InviteLink.objects.update_or_create(user_id=user_id, defaults={'link': link})
 
-# Superuser (Admin) avtomatik yaratish (Agar bazada admin bo'lmasa)
-from django.contrib.auth.models import User
-if not User.objects.filter(username='admin').exists():
-    User.objects.create_superuser('admin', 'admin@example.com', 'admin777')
-    logger.info("🔐 Django Admin uchun profil yaratildi: Login: admin | Parol: admin777")
-
 # =====================================================================
-# 7. BOT SOZLAMALARI VA GLOBAL O'ZGARUVCHILAR
+# 7. BOT INSTANCE'LARI VA GLOBAL O'ZGARUVCHILAR
 # =====================================================================
 openai_client = OpenAI(api_key=OPENAI_API_KEY)
 bot = Bot(token=TELEGRAM_TOKEN)
@@ -250,7 +257,7 @@ support_to_user = {}
 waiting_support = set()
 
 # =====================================================================
-# 8. FILTRLAR VA OPENAI
+# 8. FILTRLAR VA XAVFSIZLIK (OPENAI)
 # =====================================================================
 async def is_admin(chat_id: int, user_id: int) -> bool:
     try:
@@ -477,20 +484,18 @@ async def setup_userbot_handlers():
             except Exception: pass
 
 # =====================================================================
-# 12. HAQIQIY DJANGO VEB SERVERNISH ISHGA TUSHIRISH (WSGI)
+# 12. HAQIQIY DJANGO VEB SERVERNISH ISHGA TUSHIRISH (ASGI)
 # =====================================================================
 async def run_django_web_server():
     import uvicorn
     from django.core.asgi import get_asgi_application
     
-    # Django-ni ASGI rejimiga o'tkazamiz
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "__main__")
     asgi_app = get_asgi_application()
     
     port = int(os.getenv("PORT", 8080))
     logger.info(f"🌍 Django Veb-Server {port}-portda yoqilmoqda...")
     
-    # Uvicorn orqali veb-saytni ishga tushiramiz
     config = uvicorn.Config(asgi_app, host="0.0.0.0", port=port, log_level="warning")
     server = uvicorn.Server(config)
     await server.serve()
@@ -504,7 +509,6 @@ async def main():
     await setup_userbot_handlers()
     logger.info("🤖 TELEGRAM BOT VA DJANGO ADMIN TAYYOR!")
     
-    # Botlar va Django Veb-Saytini parallel yurgizamiz
     await asyncio.gather(
         dp.start_polling(bot), 
         userbot.run_until_disconnected(),
