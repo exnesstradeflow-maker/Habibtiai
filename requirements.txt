@@ -1,1 +1,8 @@
-
+django
+aiogram
+telethon
+openai
+pillow
+requests
+asgiref
+python-dotenv
