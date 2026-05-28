@@ -354,8 +354,273 @@ def home_view(request):
     """
     return HttpResponse(html_content)
 
+
+
+# =====================================================================
+# 🚀 PREMIUM TELEGRAM BOT DASHBOARD
+# =====================================================================
+from django.contrib.auth.models import User
+
+def premium_dashboard(request):
+
+    stats = {
+        "users": User.objects.count(),
+        "bad_words": BadWord.objects.count(),
+        "warnings": UserWarning.objects.count(),
+        "violations": AdminViolation.objects.count(),
+    }
+
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+
+        <title>⚜ Mafia Dashboard</title>
+
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+        <style>
+
+            *{
+                margin:0;
+                padding:0;
+                box-sizing:border-box;
+                font-family:Arial;
+            }
+
+            body{
+                background:#0b1120;
+                color:white;
+                display:flex;
+            }
+
+            .sidebar{
+                width:260px;
+                height:100vh;
+                background:linear-gradient(180deg,#111827,#0f172a);
+                position:fixed;
+                padding:25px;
+                border-right:1px solid rgba(255,255,255,0.05);
+            }
+
+            .logo{
+                font-size:30px;
+                font-weight:bold;
+                color:#ffd700;
+                margin-bottom:40px;
+            }
+
+            .menu a{
+                display:block;
+                padding:15px;
+                text-decoration:none;
+                color:#cbd5e1;
+                border-radius:14px;
+                margin-bottom:12px;
+                transition:0.3s;
+                background:rgba(255,255,255,0.03);
+            }
+
+            .menu a:hover{
+                background:#ffd700;
+                color:black;
+                transform:translateX(5px);
+            }
+
+            .main{
+                margin-left:260px;
+                width:100%;
+                padding:30px;
+            }
+
+            .topbar{
+                display:flex;
+                justify-content:space-between;
+                align-items:center;
+                margin-bottom:30px;
+            }
+
+            .title{
+                font-size:35px;
+                font-weight:bold;
+            }
+
+            .status{
+                background:#22c55e;
+                padding:10px 20px;
+                border-radius:20px;
+                font-weight:bold;
+            }
+
+            .cards{
+                display:grid;
+                grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+                gap:20px;
+            }
+
+            .card{
+                background:rgba(255,255,255,0.05);
+                border:1px solid rgba(255,255,255,0.05);
+                padding:25px;
+                border-radius:20px;
+                backdrop-filter:blur(10px);
+                transition:0.3s;
+            }
+
+            .card:hover{
+                transform:translateY(-5px);
+                border-color:#ffd700;
+                box-shadow:0 10px 30px rgba(255,215,0,0.2);
+            }
+
+            .card h2{
+                color:#ffd700;
+                font-size:40px;
+                margin-bottom:10px;
+            }
+
+            .chart-box{
+                margin-top:30px;
+                background:rgba(255,255,255,0.05);
+                padding:25px;
+                border-radius:20px;
+            }
+
+        </style>
+
+    </head>
+
+    <body>
+
+        <div class="sidebar">
+
+            <div class="logo">
+                ⚜ Mafia
+            </div>
+
+            <div class="menu">
+
+                <a href="/dashboard/">🏠 Dashboard</a>
+
+                <a href="/admin/">⚙ Django Admin</a>
+
+                <a href="#">👥 Users</a>
+
+                <a href="#">🚫 Bans</a>
+
+                <a href="#">📊 Analytics</a>
+
+                <a href="#">🤖 AI Moderation</a>
+
+                <a href="#">⚡ Logs</a>
+
+            </div>
+
+        </div>
+
+        <div class="main">
+
+            <div class="topbar">
+
+                <div class="title">
+                    Telegram Bot Dashboard
+                </div>
+
+                <div class="status">
+                    ONLINE
+                </div>
+
+            </div>
+
+            <div class="cards">
+
+                <div class="card">
+                    <h2>{stats['users']}</h2>
+                    <p>Total Users</p>
+                </div>
+
+                <div class="card">
+                    <h2>{stats['bad_words']}</h2>
+                    <p>Bad Words</p>
+                </div>
+
+                <div class="card">
+                    <h2>{stats['warnings']}</h2>
+                    <p>Warnings</p>
+                </div>
+
+                <div class="card">
+                    <h2>{stats['violations']}</h2>
+                    <p>Admin Violations</p>
+                </div>
+
+            </div>
+
+            <div class="chart-box">
+
+                <h2 style="margin-bottom:20px;">
+                    📊 Statistics
+                </h2>
+
+                <canvas id="statsChart"></canvas>
+
+            </div>
+
+        </div>
+
+        <script>
+
+            const ctx = document.getElementById('statsChart');
+
+            new Chart(ctx, {
+
+                type: 'bar',
+
+                data: {
+
+                    labels: [
+                        'Users',
+                        'Bad Words',
+                        'Warnings',
+                        'Violations'
+                    ],
+
+                    datasets: [{
+                        label: 'Bot Statistics',
+
+                        data: [
+                            {stats['users']},
+                            {stats['bad_words']},
+                            {stats['warnings']},
+                            {stats['violations']}
+                        ],
+
+                        borderWidth:1
+                    }]
+
+                },
+
+                options: {
+                    responsive:true
+                }
+
+            });
+
+        </script>
+
+    </body>
+    </html>
+    """
+
+    return HttpResponse(html)
+
+
+
 urlpatterns = [
     path('', home_view),
+    path('dashboard/', premium_dashboard),
     path('admin/', admin.site.urls),
 ]
 
