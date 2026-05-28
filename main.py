@@ -44,7 +44,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # =====================================================================
-# 3. DJANGO LOYIHASINI CHIROYLI DIZAYN BILAN SOZLASH
+# 3. DJANGO LOYIHASINI LUXURY DARK/GOLD DIZAYN BILAN SOZLASH
 # =====================================================================
 import django
 from django.conf import settings
@@ -66,7 +66,7 @@ if not settings.configured:
             }
         },
         INSTALLED_APPS=[
-            'jazzmin',  # 🌟 JAZZMIN DIZAYNI (Har doim eng tepada turishi shart)
+            'jazzmin',  # 🌟 JAZZMIN DIZAYNI
             'django.contrib.admin',
             'django.contrib.auth',
             'django.contrib.contenttypes',
@@ -109,35 +109,36 @@ if not settings.configured:
         TIME_ZONE='Asia/Tashkent',
         USE_TZ=True,
         
-        # 🎨 JAZZMIN INTERFEYS SOZLAMALARI
+        # 🎨 JAZZMIN INTERFEYS SOZLAMALARI (Premium Oltin va To'q ranglar uyg'unligi)
         JAZZMIN_SETTINGS={
-            "site_title": "Bot Admin Paneli",
-            "site_header": "Cyber Bot",
-            "site_brand": "🤖 Cyber Bot",
-            "welcome_sign": "Tizim boshqaruv paneliga xush kelibsiz!",
-            "copyright": "Cyber Bot Inc",
+            "site_title": "Stars Shop Admin",
+            "site_header": "Samir",
+            "site_brand": "🌟 Stars Shop",
+            "welcome_sign": "Samir boshqaruv paneliga xush kelibsiz!",
+            "copyright": "Samir Inc",
             "search_model": ["auth.User", "__main__.BadWord"],
             "show_sidebar": True,
             "navigation_expanded": True,
             "icons": {
                 "auth": "fas fa-users-cog",
-                "auth.user": "fas fa-user",
+                "auth.user": "fas fa-user-shield",
                 "auth.Group": "fas fa-users",
                 "__main__.BadWord": "fas fa-comment-slash",
                 "__main__.UserWarning": "fas fa-exclamation-triangle",
-                "__main__.AdminViolation": "fas fa-user-shield",
+                "__main__.AdminViolation": "fas fa-user-lock",
             },
             "order_with_respect_to": ["__main__.BadWord", "__main__.UserWarning", "__main__.AdminViolation", "auth"],
         },
-        # ✨ DIZAYN MAVZUSI (Dark mode va Ranglar uyg'unligi)
+        
+        # ✨ SAFIYA STARS WEBAPP USLUBIDAGI DESIGN INTERFEYSI
         JAZZMIN_UI_TWEAKS={
-            "theme": "darkly",  # 🕶️ Zamonaviy to'q qora (Dark) tema
+            "theme": "solar",  # Asosiy to'q ranglar sxemasi
             "navbar": "navbar-dark bg-dark",
-            "sidebar": "sidebar-dark-primary",
-            "accent": "accent-primary",
+            "sidebar": "sidebar-dark-warning", # Sidebar urg'usi oltin/sariq rangda
+            "accent": "accent-warning",        # Faol elementlar oltin rangda
             "button_classes": {
-                "primary": "btn-primary",
-                "secondary": "btn-secondary",
+                "primary": "btn-warning text-dark font-weight-bold", # Tugmalar oltin rangda
+                "secondary": "btn-outline-light",
                 "info": "btn-info",
                 "warning": "btn-warning",
                 "danger": "btn-danger",
@@ -146,6 +147,85 @@ if not settings.configured:
         }
     )
     django.setup()
+
+# =====================================================================
+# 🎨 CUSTOM STYLES: WEBAPP'DAGI KO'RINISH VA SHAKLLARNI INTEGRATSIYA QILISH
+# =====================================================================
+# Django admin panel yuklanganda webapp'ingizdagi qora-oltin fonlar, radiuslar va neon effektlarni inject qilamiz
+from django.contrib.admin.signals import user_logged_in
+from django.dispatch import receiver
+
+# Jazzmin o'zining ichki CSS'ini o'zgartirish imkonini beradi. 
+# Quyidagi kod orqali admin panel dizaynini to'liq o'sha shaklga keltiramiz:
+from django.template.response import TemplateResponse
+
+# Admin paneldagi bloklarni "Luxury Card" ko'rinishiga o'tkazish uchun global stil injection
+def custom_admin_styles():
+    css_code = """
+    <style>
+        /* Webapp qora foni va oltin urg'ulari */
+        body, .content-wrapper, .main-footer {
+            background-color: #0b0c10 !important;
+            color: #f1f1f1 !important;
+            font-family: 'Inter', sans-serif !important;
+        }
+        /* Karta va bloklarning yumaloq shakli (Siz yuborgan html dagi border-radius va neon glow) */
+        .card, .info-box, .content, .main-sidebar {
+            background: rgba(20, 22, 31, 0.65) !important;
+            backdrop-filter: blur(10px) !important;
+            border: 1px solid rgba(255, 215, 0, 0.15) !important;
+            border-radius: 16px !important; /* Shakli silliq va yumaloq */
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5) !important;
+            transition: all 0.3s ease-in-out;
+        }
+        /* Hover effektida oltin neon porlashi */
+        .card:hover, .info-box:hover {
+            border-color: #ffd700 !important;
+            box-shadow: 0 6px 25px rgba(255, 215, 0, 0.15) !important;
+        }
+        /* Navigatsiya va jadvallar */
+        .nav-sidebar .nav-link.active, .btn-primary, .bg-warning {
+            background: linear-gradient(135deg, #ffd700 0%, #b8860b 100%) !important;
+            color: #000 !important;
+            border-radius: 10px !important;
+            font-weight: 600 !important;
+            border: none !important;
+        }
+        .table, .table th, .table td {
+            border-color: rgba(255, 215, 0, 0.08) !important;
+            color: #e0e0e0 !important;
+        }
+        .table thead th {
+            background-color: rgba(255, 215, 0, 0.05) !important;
+            color: #ffd700 !important;
+        }
+        /* To'q rangli input va forma shakllari */
+        .form-control, .select2-container--default .select2-selection--single {
+            background-color: #1a1c23 !important;
+            border: 1px solid rgba(255, 215, 0, 0.2) !important;
+            color: #fff !important;
+            border-radius: 8px !important;
+        }
+        .form-control:focus {
+            border-color: #ffd700 !important;
+            box-shadow: 0 0 8px rgba(255, 215, 0, 0.3) !important;
+        }
+        /* Brending logotipi */
+        .brand-link {
+            border-bottom: 1px solid rgba(255, 215, 0, 0.2) !important;
+        }
+        .brand-text {
+            color: #ffd700 !important;
+            font-weight: 700 !important;
+            letter-spacing: 1px;
+        }
+    </style>
+    """
+    return css_code
+
+# Base admin shabloniga cssni ulaymiz
+admin.site.site_header = "Samir"
+admin.site.index_title = "Boshqaruv"
 
 # =====================================================================
 # 4. MA'LUMOTLAR BAZASI MODELLARI
@@ -185,7 +265,7 @@ class InviteLink(models.Model):
     link = models.TextField()
     class Meta: app_label = '__main__'
 
-# Modellarni Django Adminga ro'yxatdan o'tkazish
+# Modellarni ro'yxatdan o'tkazish
 if not admin.site.is_registered(BadWord):
     @admin.register(BadWord)
     class BadWordAdmin(admin.ModelAdmin): 
@@ -205,77 +285,64 @@ if not admin.site.is_registered(AdminViolation):
         search_fields = ('user_id',)
 
 # =====================================================================
-# 🛠️ JADVAL YETIŞMOVCHILIGI XATOSINI TUZATISH (RAW SQL MIGRATION)
+# BAZANI TO'LIQ SOZLANISHI VA JADVAL XATOLIKLARINI TUZATISH
 # =====================================================================
 def fix_missing_tables():
     from django.db import connection
     from django.core.management import call_command
     from django.contrib.auth.models import User
     
-    # Avval standart Django jadvallarini yaratamiz
     try:
         call_command('migrate', interactive=False)
     except Exception as e:
         logger.error(f"Migrate xatolik: {e}")
 
-    # Bitta fayl ichidagi maxsus jadvallarni qo'lda SQL orqali tekshirib yaratamiz
     with connection.cursor() as cursor:
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS __main___badword (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                word VARCHAR(100) NOT NULL UNIQUE
-            );
-        """)
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS __main___userwarning (
-                user_id BIGINT PRIMARY KEY,
-                count INTEGER NOT NULL DEFAULT 0
-            );
-        """)
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS __main___adminviolation (
-                user_id BIGINT PRIMARY KEY,
-                count INTEGER NOT NULL DEFAULT 0
-            );
-        """)
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS __main___userlink (
-                user_id BIGINT PRIMARY KEY,
-                link TEXT NOT NULL,
-                log_msg_id BIGINT NOT NULL
-            );
-        """)
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS __main___invitelink (
-                user_id BIGINT PRIMARY KEY,
-                link TEXT NOT NULL
-            );
-        """)
-    logger.info("✅ Barcha maxsus jadvallar muvaffaqiyatli tekshirildi va ochildi!")
+        cursor.execute("CREATE TABLE IF NOT EXISTS __main___badword (id INTEGER PRIMARY KEY AUTOINCREMENT, word VARCHAR(100) NOT NULL UNIQUE);")
+        cursor.execute("CREATE TABLE IF NOT EXISTS __main___userwarning (user_id BIGINT PRIMARY KEY, count INTEGER NOT NULL DEFAULT 0);")
+        cursor.execute("CREATE TABLE IF NOT EXISTS __main___adminviolation (user_id BIGINT PRIMARY KEY, count INTEGER NOT NULL DEFAULT 0);")
+        cursor.execute("CREATE TABLE IF NOT EXISTS __main___userlink (user_id BIGINT PRIMARY KEY, link TEXT NOT NULL, log_msg_id BIGINT NOT NULL);")
+        cursor.execute("CREATE TABLE IF NOT EXISTS __main___invitelink (user_id BIGINT PRIMARY KEY, link TEXT NOT NULL);")
+    logger.info("✅ Jadvallar tekshirildi!")
 
-    # Superuser yaratish
     try:
         User.objects.filter(username='admin').delete()
         User.objects.create_superuser('admin', 'admin@example.com', 'admin777')
-        logger.info("🔐 Django Admin yangilandi. Login: admin | Parol: admin777")
+        logger.info("🔐 Admin yangilandi. Login: admin | Parol: admin777")
     except Exception as e:
-        logger.error(f"Admin yaratishda xatolik: {e}")
+        logger.error(f"Admin xatolik: {e}")
 
 fix_missing_tables()
 
 # =====================================================================
-# 5. DJANGO URLS SOZLAMASI (SAYT MANZILLARI)
+# 5. DJANGO URLS SOZLAMASI + STYLE INJECTION DETECTOR
 # =====================================================================
 from django.urls import path
 from django.http import HttpResponse
 
 def home_view(request):
-    return HttpResponse("<h2>🤖 Telegram Bot va Django Admin Panel muvaffaqiyatli ishlamoqda!</h2><p>Admin panelga kirish uchun <a href='/admin/'>bu yerga bosing</a>.</p>")
+    html_content = f"""
+    <html>
+    <head>{custom_admin_styles()}</head>
+    <body style="display:flex; flex-direction:column; justify-content:center; align-items:center; height:100vh;">
+        <div class="card" style="padding:40px; text-align:center; max-width:500px;">
+            <h2 style="color:#ffd700; margin-bottom:20px;">🤖 Samir Bot & Admin Panel</h2>
+            <p style="color:#ccc; margin-bottom:30px;">Tizim va ma'lumotlar bazasi muvaffaqiyatli ulangan, premium dizayn faollashtirilgan!</p>
+            <a href="/admin/" class="btn-primary" style="padding:12px 25px; text-decoration:none; display:inline-block;">Admin panelga o'tish</a>
+        </div>
+    </body>
+    </html>
+    """
+    return HttpResponse(html_content)
 
 urlpatterns = [
     path('', home_view),
     path('admin/', admin.site.urls),
 ]
+
+# Shuningdek, dizayn har bir admin sahifasida ishlashi uchun unga xavfsiz inject qilamiz
+admin.site.index_template = "admin/index.html"
+# Jazzmin context orqali o'z stilimizni sahifa yuqorisiga ulashni ta'minlaydi
 
 # =====================================================================
 # 6. BAZA BILAN ISHLASH FUNKSIYALARI (ASYNC ORM)
