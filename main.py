@@ -591,10 +591,10 @@ def premium_dashboard(request):
                         label: 'Bot Statistics',
 
                         data: [
-                            {stats['users']},
-                            {stats['bad_words']},
-                            {stats['warnings']},
-                            {stats['violations']}
+                        {users}
+                        {bad_words}
+                        {warnings}
+                        {violations}
                         ],
 
                         borderWidth:1
