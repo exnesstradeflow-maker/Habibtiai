@@ -152,7 +152,7 @@ if not settings.configured:
 # 🎨 CUSTOM STYLES: WEBAPP'DAGI KO'RINISH VA SHAKLLARNI INTEGRATSIYA QILISH
 # =====================================================================
 # Django admin panel yuklanganda webapp'ingizdagi qora-oltin fonlar, radiuslar va neon effektlarni inject qilamiz
-from django.contrib.admin.signals import user_logged_in
+from django.contrib.auth.signals import user_logged_in
 from django.dispatch import receiver
 
 # Jazzmin o'zining ichki CSS'ini o'zgartirish imkonini beradi. 
