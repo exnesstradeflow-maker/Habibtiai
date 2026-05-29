@@ -78,7 +78,7 @@ if not settings.configured:
         ROOT_URLCONF='__main__',
         MIDDLEWARE=[
             'django.middleware.security.SecurityMiddleware',
-            'whitenoise.middleware.WhiteNoiseMiddleware',  # 🚀 RAILIWAY'DA DIZAYN CHIQISHI UCHUN QO'SHILDI!
+            'whitenoise.middleware.WhiteNoiseMiddleware',  # 🚀 RAILWAY'DA DIZAYN CHIQISHI UCHUN QO'SHILDI!
             'django.contrib.sessions.middleware.SessionMiddleware',
             'django.middleware.common.CommonMiddleware',
             'django.middleware.csrf.CsrfViewMiddleware',
@@ -100,7 +100,6 @@ if not settings.configured:
             },
         }],
 
-        # ── STATIK FAYLLAR ──────────────────────────────────────────
         STATIC_URL='/static/',
         STATICFILES_DIRS=[
             os.path.join(BASE_DIR, 'static'),   # ← mafia_custom.css shu yerda
@@ -116,64 +115,46 @@ if not settings.configured:
         TIME_ZONE='Asia/Tashkent',
         USE_TZ=True,
 
-        # ══════════════════════════════════════════════════════════════
-        # 🎨 JAZZMIN ASOSIY SOZLAMALARI
-        # ══════════════════════════════════════════════════════════════
         JAZZMIN_SETTINGS={
-            # ── Brend ─────────────────────────────────────────────────
             "site_title":    "Mafia Habibiti Admin",
             "site_header":   "⚜ Mafia Habibiti",
             "site_brand":    "⚜ Mafia Habibiti",
             "welcome_sign":  "Boshqaruv Paneliga Xush Kelibsiz!",
             "copyright":     "Mafia Habibiti Inc",
-
-            # ── Qidiruv ───────────────────────────────────────────────
             "search_model": ["auth.User", "__main__.BadWord"],
-
-            # ── Sidebar ───────────────────────────────────────────────
             "show_sidebar":          True,
             "navigation_expanded":   True,
             "hide_apps":             [],
             "hide_models":           [],
-
-            # ── Ikonkalar ─────────────────────────────────────────────
             "icons": {
                 "auth":                      "fas fa-users-cog",
                 "auth.user":                 "fas fa-user-shield",
                 "auth.Group":                "fas fa-users",
+                "__main__.TelegramUser":     "fas fa-users",
+                "__main__.BroadcastMessage": "fas fa-paper-plane",
                 "__main__.BadWord":          "fas fa-ban",
                 "__main__.UserWarning":      "fas fa-exclamation-triangle",
                 "__main__.AdminViolation":   "fas fa-user-lock",
             },
             "default_icon_parents":  "fas fa-chevron-circle-right",
             "default_icon_children": "fas fa-circle",
-
-            # ── Tartib ────────────────────────────────────────────────
             "order_with_respect_to": [
+                "__main__.TelegramUser",
+                "__main__.BroadcastMessage",
                 "__main__.BadWord",
                 "__main__.UserWarning",
                 "__main__.AdminViolation",
                 "auth",
             ],
-
-            # ── Custom CSS — bu yerda mafia_custom.css ulanadi ────────
             "custom_css": "admin/css/mafia_custom.css",
             "custom_js":  None,
-
-            # ── Boshqa ────────────────────────────────────────────────
-            "show_ui_builder":    False,   # Production uchun False
+            "show_ui_builder":    False,
             "changeform_format":  "horizontal_tabs",
             "language_chooser":   False,
         },
 
-        # ══════════════════════════════════════════════════════════════
-        # ✨ JAZZMIN UI TWEAKS — Dark Gold tema
-        # ══════════════════════════════════════════════════════════════
         JAZZMIN_UI_TWEAKS={
-            # AdminLTE 3 temalari: darkly, solar, cyborg, slate, superhero
             "theme":           "darkly",
-
-            # Navbar va Sidebar ranglari
             "navbar":          "navbar-dark bg-dark",
             "no_navbar_border": True,
             "navbar_fixed":    True,
@@ -184,14 +165,8 @@ if not settings.configured:
             "sidebar_nav_compact_style": False,
             "sidebar_nav_flat_style":   False,
             "sidebar_nav_legacy_style": False,
-
-            # Accent rang — warning = oltin
             "accent": "accent-warning",
-
-            # Footer
             "footer_fixed": False,
-
-            # Tugma stillari
             "button_classes": {
                 "primary":   "btn-warning text-dark font-weight-bold",
                 "secondary": "btn-outline-secondary",
@@ -200,8 +175,6 @@ if not settings.configured:
                 "danger":    "btn-danger",
                 "success":   "btn-success",
             },
-
-            # Actions tugmalari
             "actions_sticky_top": True,
         },
     )
@@ -210,16 +183,64 @@ if not settings.configured:
 # =====================================================================
 # 4. MODELLAR
 # =====================================================================
-class BadWord(models.Model):
-    word = models.CharField(
-        "Taqiqlangan so'z / Запрещённое слово",
-        max_length=100,
-        unique=True
-    )
+class TelegramUser(models.Model):
+    user_id = models.BigIntegerField("Foydalanuvchi ID", primary_key=True)
+    username = models.CharField("Telegram Username", max_length=150, null=True, blank=True)
+    first_name = models.CharField("Ismi", max_length=150, null=True, blank=True)
+    joined_at = models.DateTimeField("Qo'shilgan vaqti", auto_now_add=True)
 
     def __str__(self):
-        return self.word
+        return f"{self.first_name or 'User'} ({self.user_id})"
 
+    class Meta:
+        app_label = '__main__'
+        verbose_name = "Bot Foydalanuvchisi"
+        verbose_name_plural = "👥 Bot Foydalanuvchilari"
+
+
+class BroadcastMessage(models.Model):
+    text = models.TextField("Xabar matni (HTML formatida yozish mumkin)", help_text="Masalan: <b>Salom</b>")
+    photo_url = models.URLField("Rasm URL manzili (ixtiyoriy)", null=True, blank=True, help_text="Rasm bilan yuborish uchun havola qo'ying")
+    created_at = models.DateTimeField("Yaratilgan vaqti", auto_now_add=True)
+    is_sent = models.BooleanField("Yuborildimi?", default=False, editable=False)
+
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None
+        super().save(*args, **kwargs)
+        if is_new and not self.is_sent:
+            # Xabar saqlanishi bilan fonda hamma foydalanuvchilarga yuboriladi
+            asyncio.run_coroutine_threadsafe(self.start_broadcast(), asyncio.get_event_loop())
+
+    async def start_broadcast(self):
+        await asyncio.sleep(2) # DB tranzaksiyasi to'liq yakunlanishi uchun biroz kutish
+        users = await sync_to_async(list)(TelegramUser.objects.all())
+        logger.info(f"📢 Rassilka boshlandi. Jami foydalanuvchilar: {len(users)}")
+        
+        success, failed = 0, 0
+        for u in users:
+            try:
+                if self.photo_url:
+                    await bot.send_photo(chat_id=u.user_id, photo=self.photo_url, caption=self.text, parse_mode="HTML")
+                else:
+                    await bot.send_message(chat_id=u.user_id, text=self.text, parse_mode="HTML")
+                success += 1
+                await asyncio.sleep(0.05) # Telegram limitlariga tushib qolmaslik uchun kichik kechikish
+            except Exception as e:
+                failed += 1
+                logger.error(f"Rassilka xatolik user {u.user_id}: {e}")
+        
+        await sync_to_async(BroadcastMessage.objects.filter(pk=self.pk).update)(is_sent=True)
+        logger.info(f"📢 Rassilka yakunlandi! Muvaffaqiyatli: {success}, Xatolik: {failed}")
+
+    class Meta:
+        app_label = '__main__'
+        verbose_name = "Xabarnoma yuborish"
+        verbose_name_plural = "📢 Hammaga Xabar Yuborish (Rassilka)"
+
+
+class BadWord(models.Model):
+    word = models.CharField("Taqiqlangan so'z / Запрещённое слово", max_length=100, unique=True)
+    def __str__(self): return self.word
     class Meta:
         app_label = '__main__'
         verbose_name = "Taqiqlangan so'z"
@@ -227,15 +248,8 @@ class BadWord(models.Model):
 
 
 class UserWarning(models.Model):
-    user_id = models.BigIntegerField(
-        "Foydalanuvchi ID / ID пользователя",
-        primary_key=True
-    )
-    count = models.IntegerField(
-        "Ogohlantirishlar soni / Кол-во предупреждений",
-        default=0
-    )
-
+    user_id = models.BigIntegerField("Foydalanuvchi ID / ID пользователя", primary_key=True)
+    count = models.IntegerField("Ogohlantirishlar soni / Кол-во предупреждений", default=0)
     class Meta:
         app_label = '__main__'
         verbose_name = "Foydalanuvchi ogohlantirishi"
@@ -243,15 +257,8 @@ class UserWarning(models.Model):
 
 
 class AdminViolation(models.Model):
-    user_id = models.BigIntegerField(
-        "Admin ID / ID админа",
-        primary_key=True
-    )
-    count = models.IntegerField(
-        "Qoida buzish soni / Кол-во нарушений",
-        default=0
-    )
-
+    user_id = models.BigIntegerField("Admin ID / ID админа", primary_key=True)
+    count = models.IntegerField("Qoida buzish soni / Кол-во нарушения", default=0)
     class Meta:
         app_label = '__main__'
         verbose_name = "Admin xatosi"
@@ -272,38 +279,42 @@ class InviteLink(models.Model):
 
 
 # =====================================================================
-# 5. ADMIN REGISTRATSIYA — chiroyli ko'rinish
+# 5. ADMIN REGISTRATSIYA
 # =====================================================================
+if not admin.site.is_registered(TelegramUser):
+    @admin.register(TelegramUser)
+    class TelegramUserAdmin(admin.ModelAdmin):
+        list_display = ('user_id', 'username', 'first_name', 'joined_at')
+        search_fields = ('user_id', 'username', 'first_name')
+
+if not admin.site.is_registered(BroadcastMessage):
+    @admin.register(BroadcastMessage)
+    class BroadcastMessageAdmin(admin.ModelAdmin):
+        list_display = ('id', 'created_at', 'is_sent')
+        readonly_fields = ('is_sent',)
+
 if not admin.site.is_registered(BadWord):
     @admin.register(BadWord)
     class BadWordAdmin(admin.ModelAdmin):
-        list_display  = ('id', 'word')
-        search_fields = ('word',)
-        ordering      = ('word',)
-        list_per_page = 25
+        list_display, search_fields, ordering, list_per_page = ('id', 'word'), ('word',), ('word',), 25
 
 if not admin.site.is_registered(UserWarning):
     @admin.register(UserWarning)
     class UserWarningAdmin(admin.ModelAdmin):
-        list_display  = ('user_id', 'count')
-        search_fields = ('user_id',)
-        ordering      = ('-count',)
-        list_per_page = 25
+        list_display, search_fields, ordering, list_per_page = ('user_id', 'count'), ('user_id',), ('-count',), 25
 
 if not admin.site.is_registered(AdminViolation):
     @admin.register(AdminViolation)
     class AdminViolationAdmin(admin.ModelAdmin):
-        list_display  = ('user_id', 'count')
-        search_fields = ('user_id',)
-        ordering      = ('-count',)
-        list_per_page = 25
+        list_display, search_fields, ordering, list_per_page = ('user_id', 'count'), ('user_id',), ('-count',), 25
 
 admin.site.site_header = "⚜ Mafia Habibiti"
 admin.site.index_title = "Boshqaruv paneli"
 
 # =====================================================================
-# 6. BAZANI SOZLASH
+# 6. BAZANI SOZLASH (ASYNCHRONOUSLY FIXED)
 # =====================================================================
+@sync_to_async
 def fix_missing_tables():
     from django.db import connection
     from django.core.management import call_command
@@ -315,6 +326,8 @@ def fix_missing_tables():
         logger.error(f"Migrate xatolik: {e}")
 
     with connection.cursor() as cursor:
+        cursor.execute("CREATE TABLE IF NOT EXISTS __main___telegramuser (user_id BIGINT PRIMARY KEY, username VARCHAR(150), first_name VARCHAR(150), joined_at DATETIME NOT NULL);")
+        cursor.execute("CREATE TABLE IF NOT EXISTS __main___broadcastmessage (id INTEGER PRIMARY KEY AUTOINCREMENT, text TEXT NOT NULL, photo_url VARCHAR(200), created_at DATETIME NOT NULL, is_sent BOOLEAN NOT NULL);")
         cursor.execute("CREATE TABLE IF NOT EXISTS __main___badword (id INTEGER PRIMARY KEY AUTOINCREMENT, word VARCHAR(100) NOT NULL UNIQUE);")
         cursor.execute("CREATE TABLE IF NOT EXISTS __main___userwarning (user_id BIGINT PRIMARY KEY, count INTEGER NOT NULL DEFAULT 0);")
         cursor.execute("CREATE TABLE IF NOT EXISTS __main___adminviolation (user_id BIGINT PRIMARY KEY, count INTEGER NOT NULL DEFAULT 0);")
@@ -334,7 +347,6 @@ def fix_missing_tables():
 # =====================================================================
 from django.urls import path
 from django.http import HttpResponse
-
 
 def home_view(request):
     return HttpResponse("""
@@ -360,7 +372,6 @@ def home_view(request):
     </html>
     """)
 
-
 urlpatterns = [
     path('', home_view),
     path('admin/', admin.site.urls),
@@ -369,6 +380,13 @@ urlpatterns = [
 # =====================================================================
 # 8. ORM FUNKSIYALARI (ASYNC)
 # =====================================================================
+@sync_to_async
+def save_user_to_db(user_id: int, username: str, first_name: str):
+    TelegramUser.objects.get_or_create(
+        user_id=user_id,
+        defaults={'username': username, 'first_name': first_name}
+    )
+
 @sync_to_async
 def check_bad_words_in_db(text: str) -> bool:
     text_lower = text.lower()
@@ -386,10 +404,8 @@ def get_warning(user_id: int) -> int:
 
 @sync_to_async
 def set_warning(user_id: int, count: int):
-    if count <= 0:
-        UserWarning.objects.filter(user_id=user_id).delete()
-    else:
-        UserWarning.objects.update_or_create(user_id=user_id, defaults={'count': count})
+    if count <= 0: UserWarning.objects.filter(user_id=user_id).delete()
+    else: UserWarning.objects.update_or_create(user_id=user_id, defaults={'count': count})
 
 @sync_to_async
 def get_admin_violation(user_id: int) -> int:
@@ -398,18 +414,15 @@ def get_admin_violation(user_id: int) -> int:
 
 @sync_to_async
 def set_admin_violation(user_id: int, count: int):
-    if count <= 0:
-        AdminViolation.objects.filter(user_id=user_id).delete()
-    else:
-        AdminViolation.objects.update_or_create(user_id=user_id, defaults={'count': count})
+    if count <= 0: AdminViolation.objects.filter(user_id=user_id).delete()
+    else: AdminViolation.objects.update_or_create(user_id=user_id, defaults={'count': count})
 
 @sync_to_async
 def get_user_link(user_id: int):
     try:
         obj = UserLink.objects.get(user_id=user_id)
         return {"link": obj.link, "log_msg_id": obj.log_msg_id}
-    except UserLink.DoesNotExist:
-        return None
+    except UserLink.DoesNotExist: return None
 
 @sync_to_async
 def set_user_link(user_id: int, link: str, log_msg_id: int):
@@ -421,10 +434,8 @@ def delete_user_link(user_id: int):
 
 @sync_to_async
 def get_invite_link(user_id: int):
-    try:
-        return InviteLink.objects.get(user_id=user_id).link
-    except InviteLink.DoesNotExist:
-        return None
+    try: return InviteLink.objects.get(user_id=user_id).link
+    except InviteLink.DoesNotExist: return None
 
 @sync_to_async
 def set_invite_link(user_id: int, link: str):
@@ -451,17 +462,14 @@ async def is_admin(chat_id: int, user_id: int) -> bool:
     try:
         member = await bot.get_chat_member(chat_id, user_id)
         return member.status in ["administrator", "creator"]
-    except Exception:
-        return False
+    except Exception: return False
 
 async def send_private(user_id: int, text: str, reply_markup=None):
     try:
         await bot.send_message(user_id, text, reply_markup=reply_markup, parse_mode="HTML")
     except Exception:
-        try:
-            await userbot.send_message(user_id, text)
-        except Exception as e:
-            logger.error(f"Shaxsiy xabar yuborib bo'lmadi: {e}")
+        try: await userbot.send_message(user_id, text)
+        except Exception as e: logger.error(f"Shaxsiy xabar yuborib bo'lmadi: {e}")
 
 async def send_log(text: str, user_id: int = None, unblock_button: bool = False):
     markup = None
@@ -469,10 +477,12 @@ async def send_log(text: str, user_id: int = None, unblock_button: bool = False)
         markup = InlineKeyboardMarkup(inline_keyboard=[[
             InlineKeyboardButton(text="✅ Blokdan chiqarish", callback_data=f"unblock_{user_id}")
         ]])
-    try:
-        await bot.send_message(LOG_CHAT_ID, text, reply_markup=markup, parse_mode="HTML")
-    except Exception as e:
-        logger.error(f"Log xatolik: {e}")
+    try: await bot.send_message(LOG_CHAT_ID, text, reply_markup=markup, parse_mode="HTML")
+    except Exception as e: logger.error(f"Log xatolik: {e}")
+
+# Async threadpool wrapper OpenAI uchun (loyihani muzlatib qo'ymaslik maqsadida)
+async def analyze_image_async(file_bytes: bytes) -> bool:
+    return await asyncio.to_thread(analyze_image_with_openai, file_bytes)
 
 def analyze_image_with_openai(file_bytes: bytes) -> bool:
     try:
@@ -493,11 +503,8 @@ def analyze_image_with_openai(file_bytes: bytes) -> bool:
 async def get_image_bytes(file_id: str) -> bytes | None:
     try:
         file = await bot.get_file(file_id)
-        response = requests.get(
-            f"https://api.telegram.org/file/bot{TELEGRAM_TOKEN}/{file.file_path}", timeout=30
-        )
-        if response.status_code != 200:
-            return None
+        response = requests.get(f"https://api.telegram.org/file/bot{TELEGRAM_TOKEN}/{file.file_path}", timeout=30)
+        if response.status_code != 200: return None
         image = Image.open(io.BytesIO(response.content)).convert("RGB")
         buf = io.BytesIO()
         image.save(buf, format="JPEG")
@@ -511,10 +518,8 @@ async def get_image_bytes(file_id: str) -> bytes | None:
 # =====================================================================
 async def handle_admin_violation(message: types.Message, reason: str):
     user_id = message.from_user.id
-    try:
-        await message.delete()
-    except Exception:
-        pass
+    try: await message.delete()
+    except Exception: pass
     count = await get_admin_violation(user_id) + 1
     await set_admin_violation(user_id, count)
     await send_private(user_id, f"⚠️ Admin qoida buzdi! {reason} ({count}/15)")
@@ -528,22 +533,16 @@ async def handle_user_penalty(message: types.Message, reason: str):
     if await is_admin(chat_id, user_id):
         await handle_admin_violation(message, reason)
         return
-    try:
-        await message.delete()
-    except Exception:
-        pass
+    try: await message.delete()
+    except Exception: pass
     count = await get_warning(user_id) + 1
     await set_warning(user_id, count)
     if count >= 3:
         try:
             await bot.ban_chat_member(chat_id=chat_id, user_id=user_id)
-            await send_log(
-                f"🚫 <b>BAN:</b> {message.from_user.first_name} ({reason})",
-                user_id=user_id, unblock_button=True
-            )
+            await send_log(f"🚫 <b>BAN:</b> {message.from_user.first_name} ({reason})", user_id=user_id, unblock_button=True)
             await set_warning(user_id, 0)
-        except Exception as e:
-            logger.error(f"Ban xatolik: {e}")
+        except Exception as e: logger.error(f"Ban xatolik: {e}")
     else:
         await send_private(user_id, f"⚠️ Ogohlantirish: {count}/3. Sabab: {reason}")
 
@@ -557,14 +556,9 @@ def create_image_captcha() -> tuple[bytes, str]:
     image = Image.new("RGB", (width, height), color=(235, 235, 235))
     draw = ImageDraw.Draw(image)
     for _ in range(8):
-        draw.line((
-            random.randint(0, width), random.randint(0, height),
-            random.randint(0, width), random.randint(0, height)
-        ), fill=(150, 150, 150), width=2)
-    try:
-        font = ImageFont.load_default()
-    except Exception:
-        font = None
+        draw.line((random.randint(0, width), random.randint(0, height), random.randint(0, width), random.randint(0, height)), fill=(150, 150, 150), width=2)
+    try: font = ImageFont.load_default()
+    except Exception: font = None
     for i, char in enumerate(captcha_text):
         draw.text((25 + (i * 40), 25), char, fill=(0, 0, 0), font=font)
     img_byte_arr = io.BytesIO()
@@ -586,18 +580,17 @@ async def send_captcha(user_id: int, user_name: str):
     try:
         captcha_file = io.BytesIO(img_bytes)
         captcha_file.name = "captcha.png"
-        await userbot.send_file(
-            user_id, captcha_file,
-            caption=f"Salom, {user_name}! 👋\n🤖 Rasm ichidagi kodni yozib yuboring!\n⏳ Vaqt: 60 soniya."
-        )
-    except Exception as e:
-        logger.error(f"Captcha yuborishda xatolik: {e}")
+        await userbot.send_file(user_id, captcha_file, caption=f"Salom, {user_name}! 👋\n🤖 Rasm ichidagi kodni yozib yuboring!\n⏳ Vaqt: 60 soniya.")
+    except Exception as e: logger.error(f"Captcha yuborishda xatolik: {e}")
 
 # =====================================================================
 # 13. AIOGRAM HANDLERS
 # =====================================================================
 @dp.message(F.text == "/start")
 async def cmd_start(message: types.Message):
+    # Har safar /start bosganda yangi user bazaga yoziladi (Rassilka bazasi shakllanishi uchun)
+    await save_user_to_db(message.from_user.id, message.from_user.username, message.from_user.first_name)
+    
     if message.chat.type == "private":
         markup = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="🔗 Havola olish",           callback_data="get_link")],
@@ -609,52 +602,38 @@ async def cmd_start(message: types.Message):
 async def contact_admin_callback(callback: CallbackQuery):
     waiting_support.add(callback.from_user.id)
     await callback.message.answer("💬 Savolingizni yozing, admin javob beradi!")
-    try:
-        await callback.answer()
-    except Exception:
-        pass
+    try: await callback.answer()
+    except Exception: pass
 
 @dp.message(F.chat.type == "private")
 async def handle_private_message(message: types.Message):
     user_id = message.from_user.id
+    # Shaxsiy chatda har qanday xabar kelganda userni bazaga qo'shib qo'yamiz
+    await save_user_to_db(user_id, message.from_user.username, message.from_user.first_name)
+
     if (message.text and message.text.startswith("/")) or user_id in captcha_pending:
         return
     if user_id in waiting_support or user_id in user_to_support:
         waiting_support.discard(user_id)
-        header = (
-            f"💬 <b>Foydalanuvchi xabari</b>\n"
-            f"👤 Ism: {message.from_user.first_name}\n"
-            f"🆔 ID: <code>{user_id}</code>\n"
-            f"{'—' * 20}\n"
-        )
+        header = f"💬 <b>Foydalanuvchi xabari</b>\n👤 Ism: {message.from_user.first_name}\n🆔 ID: <code>{user_id}</code>\n{'—' * 20}\n"
         try:
-            sent = await bot.send_message(
-                SUPPORT_CHAT_ID, header + (message.text or "[Media]"), parse_mode="HTML"
-            )
+            sent = await bot.send_message(SUPPORT_CHAT_ID, header + (message.text or "[Media]"), parse_mode="HTML")
             user_to_support[user_id] = sent.message_id
             support_to_user[sent.message_id] = user_id
             await message.answer("✅ Xabaringiz adminga yuborildi!")
-        except Exception as e:
-            logger.error(f"Support xatolik: {e}")
+        except Exception as e: logger.error(f"Support xatolik: {e}")
 
 @dp.message(F.chat.id == SUPPORT_CHAT_ID)
 async def handle_support_reply(message: types.Message):
-    if not message.reply_to_message:
-        return
+    if not message.reply_to_message: return
     replied_id = message.reply_to_message.message_id
-    if replied_id not in support_to_user:
-        return
+    if replied_id not in support_to_user: return
     target_user_id = support_to_user[replied_id]
     try:
-        await bot.send_message(
-            target_user_id,
-            f"👮 <b>Admin</b> javob berdi:\n\n{message.text or '[Media]'}",
-            parse_mode="HTML"
-        )
+        await bot.send_message(target_user_id, f"👮 <b>Admin</b> javob berdi:\n\n{message.text or '[Media]'}", parse_mode="HTML")
         user_to_support[target_user_id] = message.message_id
         support_to_user[message.message_id] = target_user_id
-    except Exception as e:
-        await message.reply(f"❌ Xabar yuborilmadi: {e}")
+    except Exception as e: await message.reply(f"❌ Xabar yuborilmadi: {e}")
 
 @dp.callback_query(F.data == "get_link")
 async def get_link_callback(callback: CallbackQuery):
@@ -665,39 +644,23 @@ async def get_link_callback(callback: CallbackQuery):
         return
     try:
         invite = await bot.create_chat_invite_link(chat_id=MAIN_CHAT_ID, member_limit=1)
-        log_msg = await bot.send_message(
-            LOG_CHAT_ID,
-            f"🔗 <b>Havola olindi</b>\n👤 {callback.from_user.first_name}\n🌐 {invite.invite_link}",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
-                InlineKeyboardButton(text="❌ Bekor qilish", callback_data=f"cancel_link_{user_id}")
-            ]]),
-            parse_mode="HTML"
-        )
+        log_msg = await bot.send_message(LOG_CHAT_ID, f"🔗 <b>Havola olindi</b>\n👤 {callback.from_user.first_name}\n🌐 {invite.invite_link}", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="❌ Bekor qilish", callback_data=f"cancel_link_{user_id}")]], parse_mode="HTML"))
         await set_user_link(user_id, invite.invite_link, log_msg.message_id)
         await callback.message.answer(f"🔗 Havolangiz:\n\n{invite.invite_link}")
         await callback.answer()
-    except Exception as e:
-        logger.error(f"Link xatolik: {e}")
+    except Exception as e: logger.error(f"Link xatolik: {e}")
 
 @dp.callback_query(F.data.startswith("cancel_link_"))
 async def cancel_link_callback(callback: CallbackQuery):
     user_id = int(callback.data.split("_")[2])
     link_data = await get_user_link(user_id)
     if link_data:
-        try:
-            await bot.revoke_chat_invite_link(chat_id=MAIN_CHAT_ID, invite_link=link_data["link"])
-        except Exception:
-            pass
+        try: await bot.revoke_chat_invite_link(chat_id=MAIN_CHAT_ID, invite_link=link_data["link"])
+        except Exception: pass
         await delete_user_link(user_id)
         await callback.answer("✅ Havola o'chirildi.")
-    try:
-        await callback.message.edit_reply_markup(
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
-                InlineKeyboardButton(text="✅ O'chirildi", callback_data="done")
-            ]])
-        )
-    except Exception:
-        pass
+    try: await callback.message.edit_reply_markup(reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="✅ O'chirildi", callback_data="done")]]))
+    except Exception: pass
 
 @dp.callback_query(F.data.startswith("unblock_"))
 async def unblock_user(callback: CallbackQuery):
@@ -710,14 +673,9 @@ async def unblock_user(callback: CallbackQuery):
             link = invite.invite_link
             await set_invite_link(user_id, link)
         await send_private(user_id, f"✅ Blokdan chiqdingiz. Havola:\n\n{link}")
-        await callback.message.edit_reply_markup(
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
-                InlineKeyboardButton(text="✅ Blokdan chiqarildi", callback_data="done")
-            ]])
-        )
+        await callback.message.edit_reply_markup(reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="✅ Blokdan chiqarildi", callback_data="done")]]))
         await callback.answer("✅ Bajarildi")
-    except Exception as e:
-        logger.error(f"Unblock xatolik: {e}")
+    except Exception as e: logger.error(f"Unblock xatolik: {e}")
 
 @dp.message(F.chat.id == MAIN_CHAT_ID, F.text)
 async def check_text(message: types.Message):
@@ -727,7 +685,7 @@ async def check_text(message: types.Message):
 @dp.message(F.chat.id == MAIN_CHAT_ID, F.photo)
 async def check_photo(message: types.Message):
     image_bytes = await get_image_bytes(message.photo[-1].file_id)
-    if image_bytes and analyze_image_with_openai(image_bytes):
+    if image_bytes and await analyze_image_async(image_bytes):
         await handle_user_penalty(message, reason="Odobsiz rasm")
 
 @dp.message(F.chat.id == MAIN_CHAT_ID, F.video | F.video_note)
@@ -735,21 +693,18 @@ async def check_video(message: types.Message):
     thumb = message.video.thumbnail if message.video else message.video_note.thumbnail
     if thumb:
         image_bytes = await get_image_bytes(thumb.file_id)
-        if image_bytes and analyze_image_with_openai(image_bytes):
+        if image_bytes and await analyze_image_async(image_bytes):
             await handle_user_penalty(message, reason="Odobsiz video")
 
 @dp.message(F.chat.id == MAIN_CHAT_ID, F.sticker | F.animation)
 async def check_media(message: types.Message):
     file_id = None
-    if message.animation:
-        file_id = message.animation.file_id
-    elif message.sticker and not message.sticker.is_animated:
-        file_id = message.sticker.file_id
-    elif message.sticker and message.sticker.thumbnail:
-        file_id = message.sticker.thumbnail.file_id
+    if message.animation: file_id = message.animation.file_id
+    elif message.sticker and not message.sticker.is_animated: file_id = message.sticker.file_id
+    elif message.sticker and message.sticker.thumbnail: file_id = message.sticker.thumbnail.file_id
     if file_id:
         image_bytes = await get_image_bytes(file_id)
-        if image_bytes and analyze_image_with_openai(image_bytes):
+        if image_bytes and await analyze_image_async(image_bytes):
             await handle_user_penalty(message, reason="Odobsiz media")
 
 @dp.chat_join_request()
@@ -761,23 +716,19 @@ async def setup_userbot_handlers():
     @userbot.on(events.NewMessage(incoming=True, func=lambda e: e.is_private))
     async def on_captcha_reply(event):
         user_id = event.sender_id
-        if user_id not in captcha_pending:
-            return
+        if user_id not in captcha_pending: return
         if event.text.strip().upper() == captcha_pending[user_id]["code"]:
             captcha_pending[user_id]["task"].cancel()
             del captcha_pending[user_id]
             try:
                 await bot.approve_chat_join_request(MAIN_CHAT_ID, user_id)
                 await send_private(user_id, "✅ Guruhga xush kelibsiz! 🎉")
-            except Exception as e:
-                logger.error(f"Approve xatolik: {e}")
+            except Exception as e: logger.error(f"Approve xatolik: {e}")
         else:
             captcha_pending[user_id]["task"].cancel()
             del captcha_pending[user_id]
-            try:
-                await bot.decline_chat_join_request(MAIN_CHAT_ID, user_id)
-            except Exception:
-                pass
+            try: await bot.decline_chat_join_request(MAIN_CHAT_ID, user_id)
+            except Exception: pass
 
 # =====================================================================
 # 14. DJANGO WEB SERVER
@@ -806,8 +757,8 @@ async def main():
     from django.core.management import call_command
     await asyncio.to_thread(call_command, 'collectstatic', interactive=False)
     
-    # Jadvallarni tekshirish va yaratish
-    fix_missing_tables()
+    # Jadvallarni tekshirish va yaratish (Xavfsiz asinxron oqimga o'tkazildi)
+    await fix_missing_tables()
     
     await userbot.start()
     await setup_userbot_handlers()
