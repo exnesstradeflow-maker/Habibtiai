@@ -7,6 +7,7 @@ import random
 import asyncio
 import logging
 import requests
+from asgiref.sync import sync_to_async
 from PIL import Image, ImageDraw, ImageFont
 from dotenv import load_dotenv
 from openai import OpenAI
