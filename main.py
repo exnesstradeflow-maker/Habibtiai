@@ -78,6 +78,7 @@ if not settings.configured:
         ROOT_URLCONF='__main__',
         MIDDLEWARE=[
             'django.middleware.security.SecurityMiddleware',
+            'whitenoise.middleware.WhiteNoiseMiddleware',  # 🚀 RAILIWAY'DA DIZAYN CHIQISHI UCHUN QO'SHILDI!
             'django.contrib.sessions.middleware.SessionMiddleware',
             'django.middleware.common.CommonMiddleware',
             'django.middleware.csrf.CsrfViewMiddleware',
@@ -104,7 +105,7 @@ if not settings.configured:
         STATICFILES_DIRS=[
             os.path.join(BASE_DIR, 'static'),   # ← mafia_custom.css shu yerda
         ],
-        STATIC_ROOT=os.path.join(BASE_DIR, 'staticfiles'),
+        STATIC_ROOT=os.path.join(BASE_DIR, 'staticfiles'), # 🚀 DIZAYNLARNI JAMLOVCHI PAPKA!
 
         ALLOWED_HOSTS=['*'],
         CSRF_TRUSTED_ORIGINS=[
@@ -327,8 +328,6 @@ def fix_missing_tables():
         logger.info("🔐 Admin yangilandi. Login: admin | Parol: admin777")
     except Exception as e:
         logger.error(f"Admin xatolik: {e}")
-
-fix_missing_tables()
 
 # =====================================================================
 # 7. URL SOZLAMALARI
@@ -802,6 +801,14 @@ async def run_django_web_server():
 # =====================================================================
 async def main():
     logger.info("🚀 TIZIM ISHGA TUSHMOQDA...")
+    
+    # 🚀 RAILWAY ISHGA TUSHGANDA JAZZMIN STILLARINI AVTOMATIK YIG'ISH
+    from django.core.management import call_command
+    await asyncio.to_thread(call_command, 'collectstatic', interactive=False)
+    
+    # Jadvallarni tekshirish va yaratish
+    fix_missing_tables()
+    
     await userbot.start()
     await setup_userbot_handlers()
     logger.info("🤖 BOT VA DJANGO ADMIN TAYYOR!")
