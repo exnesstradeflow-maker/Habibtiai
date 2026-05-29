@@ -8,3 +8,4 @@ asgiref>=3.7.2
 python-dotenv>=1.0.0
 uvicorn>=0.22.0
 django-jazzmin
+whitenoise>=6.5.0
