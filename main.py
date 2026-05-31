@@ -310,20 +310,20 @@ if not admin.site.is_registered(BroadcastMessage):
         actions = ['send_broadcast_action']
 
         def send_broadcast_action(self, request, queryset):
-    import threading
-    for msg in queryset.filter(is_sent=False):
-        def run(m=msg):
-            try:
-                # Asosiy event loop'ni ishlatamiz
-                future = asyncio.run_coroutine_threadsafe(
-                    _do_broadcast(m), _main_loop
-                )
-                future.result(timeout=300)  # 5 daqiqa kutadi
-            except Exception as e:
-                logger.error(f"Broadcast thread xatolik: {e}")
-        threading.Thread(target=run, daemon=True).start()
-    self.message_user(request, "✅ Rassilka ishga tushirildi!")
-send_broadcast_action.short_description = "📢 Tanlangan xabarlarni yuborish"
+            import threading
+            for msg in queryset.filter(is_sent=False):
+                def run(m=msg):
+                    try:
+                        if _main_loop is None:
+                            logger.error("❌ Asosiy event loop tayyor emas!")
+                            return
+                        future = asyncio.run_coroutine_threadsafe(_do_broadcast(m), _main_loop)
+                        future.result(timeout=300)
+                    except Exception as e:
+                        logger.error(f"Broadcast thread xatolik: {e}")
+                threading.Thread(target=run, daemon=True).start()
+            self.message_user(request, "✅ Rassilka ishga tushirildi!")
+        send_broadcast_action.short_description = "📢 Tanlangan xabarlarni yuborish"
 
 if not admin.site.is_registered(BadWord):
     @admin.register(BadWord)
