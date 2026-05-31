@@ -226,41 +226,30 @@ class BroadcastMessage(models.Model):
     created_at = models.DateTimeField("Yaratilgan vaqti", auto_now_add=True)
     is_sent = models.BooleanField("Yuborildimi?", default=False, editable=False)
 
-    def save(self, *args, **kwargs):
-        is_new = self.pk is None
-        super().save(*args, **kwargs)
-        if is_new and not self.is_sent:
-            # asyncio.get_event_loop() Django thread pool ichida ishlamaydi.
-            # Global _main_loop o'zgaruvchisini ishlatamiz (main() da saqlanadi).
-            try:
-                loop = _main_loop
-                if loop and loop.is_running():
-                    asyncio.run_coroutine_threadsafe(self.start_broadcast(), loop)
-                else:
-                    logger.error("❌ Rassilka: asosiy event loop topilmadi!")
-            except Exception as e:
-                logger.error(f"❌ Rassilka ishga tushirishda xatolik: {e}")
+    class Meta:
+        app_label = '__main__'
+        verbose_name = "Xabarnoma yuborish"
+        verbose_name_plural = "📢 Hammaga Xabar Yuborish (Rassilka)"
 
-    async def start_broadcast(self):
-        await asyncio.sleep(2)
-        users = await sync_to_async(list)(TelegramUser.objects.all())
-        logger.info(f"📢 Rassilka boshlandi. Jami foydalanuvchilar: {len(users)}")
 
-        success, failed = 0, 0
-        for u in users:
-            try:
-                if self.photo_url:
-                    await bot.send_photo(chat_id=u.user_id, photo=self.photo_url, caption=self.text, parse_mode="HTML")
-                else:
-                    await bot.send_message(chat_id=u.user_id, text=self.text, parse_mode="HTML")
-                success += 1
-                await asyncio.sleep(0.05)
-            except Exception as e:
-                failed += 1
-                logger.error(f"Rassilka xatolik user {u.user_id}: {e}")
-
-        await sync_to_async(BroadcastMessage.objects.filter(pk=self.pk).update)(is_sent=True)
-        logger.info(f"📢 Rassilka yakunlandi! Muvaffaqiyatli: {success}, Xatolik: {failed}")
+async def _do_broadcast(msg):
+    """BroadcastMessage ni barcha foydalanuvchilarga yuboradi."""
+    users = await sync_to_async(list)(TelegramUser.objects.all())
+    logger.info(f"📢 Rassilka boshlandi. Jami: {len(users)}")
+    success, failed = 0, 0
+    for u in users:
+        try:
+            if msg.photo_url:
+                await bot.send_photo(chat_id=u.user_id, photo=msg.photo_url, caption=msg.text, parse_mode="HTML")
+            else:
+                await bot.send_message(chat_id=u.user_id, text=msg.text, parse_mode="HTML")
+            success += 1
+            await asyncio.sleep(0.05)
+        except Exception as e:
+            failed += 1
+            logger.error(f"Rassilka xatolik user {u.user_id}: {e}")
+    await sync_to_async(BroadcastMessage.objects.filter(pk=msg.pk).update)(is_sent=True)
+    logger.info(f"📢 Rassilka yakunlandi! Muvaffaqiyatli: {success}, Xatolik: {failed}")
 
     class Meta:
         app_label = '__main__'
@@ -328,6 +317,22 @@ if not admin.site.is_registered(BroadcastMessage):
     class BroadcastMessageAdmin(admin.ModelAdmin):
         list_display = ('id', 'created_at', 'is_sent')
         readonly_fields = ('is_sent',)
+        actions = ['send_broadcast_action']
+
+        def send_broadcast_action(self, request, queryset):
+            import threading
+            for msg in queryset.filter(is_sent=False):
+                def run(m=msg):
+                    import asyncio
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    try:
+                        loop.run_until_complete(_do_broadcast(m))
+                    finally:
+                        loop.close()
+                threading.Thread(target=run, daemon=True).start()
+            self.message_user(request, "✅ Rassilka ishga tushirildi!")
+        send_broadcast_action.short_description = "📢 Tanlangan xabarlarni yuborish"
 
 if not admin.site.is_registered(BadWord):
     @admin.register(BadWord)
