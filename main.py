@@ -345,14 +345,35 @@ admin.site.index_title = "Boshqaruv paneli"
 def fix_missing_tables():
     from django.core.management import call_command
     from django.contrib.auth.models import User
+    from django.db import connection
+    from django.apps import apps
 
+    # 1. Django standart jadvallarini yaratish (auth, sessions va h.k.)
     try:
         call_command('migrate', interactive=False)
         logger.info("✅ Migratsiyalar muvaffaqiyatli bajarildi!")
     except Exception as e:
         logger.error(f"Migrate xatolik: {e}")
 
-    # Defolt bot sozlamasini yaratish
+    # 2. __main__ app modellari uchun jadvallarni to'g'ridan-to'g'ri yaratish
+    # (chunki __main__ uchun migration fayllari yo'q, migrate ularni o'tkazib ketadi)
+    try:
+        existing_tables = connection.introspection.table_names()
+        with connection.schema_editor() as schema_editor:
+            for model in apps.get_app_config('__main__').get_models():
+                table_name = model._meta.db_table
+                if table_name not in existing_tables:
+                    try:
+                        schema_editor.create_model(model)
+                        logger.info(f"✅ Jadval yaratildi: {table_name}")
+                    except Exception as e:
+                        logger.error(f"Jadval yaratishda xatolik ({model.__name__}): {e}")
+                else:
+                    logger.info(f"ℹ️ Jadval mavjud: {table_name}")
+    except Exception as e:
+        logger.error(f"Schema editor xatolik: {e}")
+
+    # 3. Defolt bot sozlamasini yaratish
     try:
         if not BotSetting.objects.exists():
             BotSetting.objects.create(is_captcha_active=True)
