@@ -364,6 +364,30 @@ if not admin.site.is_registered(BannedUser):
         ordering      = ('-banned_at',)
         list_per_page = 25
 
+        def save_model(self, request, obj, form, change):
+            super().save_model(request, obj, form, change)
+            import threading
+            def do_ban(uid=obj.user_id, fname=obj.first_name, reason=obj.reason):
+                try:
+                    if _main_loop is None:
+                        return
+                    async def _ban():
+                        try:
+                            await bot.ban_chat_member(chat_id=MAIN_CHAT_ID, user_id=uid)
+                            await send_log(
+                                f"\U0001f6a8 <b>Hafli user banlandi!</b>\n"
+                                f"\U0001f464 {fname or 'User'} — <code>{uid}</code>\n"
+                                f"\U0001f4dd Sabab: {reason or 'ko\'rsatilmagan'}"
+                            )
+                            logger.info(f"Hafli user {uid} darhol banlandi.")
+                        except Exception as e:
+                            logger.error(f"Darhol ban xatolik: {e}")
+                    future = asyncio.run_coroutine_threadsafe(_ban(), _main_loop)
+                    future.result(timeout=30)
+                except Exception as e:
+                    logger.error(f"Ban thread xatolik: {e}")
+            threading.Thread(target=do_ban, daemon=True).start()
+
 admin.site.site_header = "⚜ Mafia Habibiti"
 admin.site.index_title = "Boshqaruv paneli"
 
@@ -887,6 +911,16 @@ async def main():
     await fix_missing_tables()
     
     logger.info("🤖 BOT VA DJANGO ADMIN TAYYOR!")
+
+    # Restart xabari guruhga
+    try:
+        await bot.send_message(
+            MAIN_CHAT_ID,
+            "⚠️ <b>Diqqat!</b> Bot yangilandi va qayta ishga tushdi. Hamma narsa avvalgidek ishlaydi! ✅",
+            parse_mode="HTML"
+        )
+    except Exception as e:
+        logger.error(f"Restart xabari xatolik: {e}")
 
     await asyncio.gather(
         dp.start_polling(bot, allowed_updates=["message", "callback_query", "chat_join_request", "chat_member"]),
