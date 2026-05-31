@@ -6,7 +6,7 @@ import base64
 import random
 import asyncio
 import logging
-import requests
+import aiohttp
 from PIL import Image, ImageDraw, ImageFont
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -15,6 +15,7 @@ from telethon.sessions import StringSession
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from asgiref.sync import sync_to_async
+import dj_database_url
 
 # =====================================================================
 # 1. ATROF-MUHIT VA SOZLAMALARNI YUKLASH
@@ -55,15 +56,22 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 if not settings.configured:
     public_domain = os.getenv("RAILWAY_PUBLIC_DOMAIN", "worker-production-1a55.up.railway.app")
+    
+    # Siz taqdim etgan yoki Railway tomonidan beriladigan ma'lumotlar bazasi manzili
+    DATABASE_URL = os.getenv(
+        "DATABASE_URL", 
+        "postgresql://postgres:cnqgqNlVakEhSatvkLHKFEvaAdYKnOGa@zephyr.proxy.rlwy.net:11652/railway"
+    )
 
     settings.configure(
         DEBUG=True,
         SECRET_KEY=os.getenv("DJANGO_SECRET_KEY", "railway-secret-key-12345"),
         DATABASES={
-            'default': {
-                'ENGINE': 'django.db.backends.sqlite3',
-                'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
-            }
+            'default': dj_database_url.config(
+                default=DATABASE_URL,
+                conn_max_age=600,
+                ssl_require=False
+            )
         },
         INSTALLED_APPS=[
             'jazzmin',           # ← Birinchi bo'lishi SHART
@@ -135,10 +143,12 @@ if not settings.configured:
                 "__main__.BadWord":          "fas fa-ban",
                 "__main__.UserWarning":      "fas fa-exclamation-triangle",
                 "__main__.AdminViolation":   "fas fa-user-lock",
+                "__main__.BotSetting":       "fas fa-cogs",
             },
             "default_icon_parents":  "fas fa-chevron-circle-right",
             "default_icon_children": "fas fa-circle",
             "order_with_respect_to": [
+                "__main__.BotSetting",
                 "__main__.TelegramUser",
                 "__main__.BroadcastMessage",
                 "__main__.BadWord",
@@ -183,6 +193,18 @@ if not settings.configured:
 # =====================================================================
 # 4. MODELLAR
 # =====================================================================
+class BotSetting(models.Model):
+    is_captcha_active = models.BooleanField("Kaptcha faolmi? / Активна ли каптча?", default=True)
+
+    class Meta:
+        app_label = '__main__'
+        verbose_name = "Bot Sozlamasi"
+        verbose_name_plural = "⚙ Bot Sozlamalari"
+
+    def __str__(self):
+        return "Tizim Sozlamalari"
+
+
 class TelegramUser(models.Model):
     user_id = models.BigIntegerField("Foydalanuvchi ID", primary_key=True)
     username = models.CharField("Telegram Username", max_length=150, null=True, blank=True)
@@ -208,11 +230,10 @@ class BroadcastMessage(models.Model):
         is_new = self.pk is None
         super().save(*args, **kwargs)
         if is_new and not self.is_sent:
-            # Xabar saqlanishi bilan fonda hamma foydalanuvchilarga yuboriladi
             asyncio.run_coroutine_threadsafe(self.start_broadcast(), asyncio.get_event_loop())
 
     async def start_broadcast(self):
-        await asyncio.sleep(2) # DB tranzaksiyasi to'liq yakunlanishi uchun biroz kutish
+        await asyncio.sleep(2) 
         users = await sync_to_async(list)(TelegramUser.objects.all())
         logger.info(f"📢 Rassilka boshlandi. Jami foydalanuvchilar: {len(users)}")
         
@@ -224,7 +245,7 @@ class BroadcastMessage(models.Model):
                 else:
                     await bot.send_message(chat_id=u.user_id, text=self.text, parse_mode="HTML")
                 success += 1
-                await asyncio.sleep(0.05) # Telegram limitlariga tushib qolmaslik uchun kichik kechikish
+                await asyncio.sleep(0.05) 
             except Exception as e:
                 failed += 1
                 logger.error(f"Rassilka xatolik user {u.user_id}: {e}")
@@ -281,6 +302,12 @@ class InviteLink(models.Model):
 # =====================================================================
 # 5. ADMIN REGISTRATSIYA
 # =====================================================================
+if not admin.site.is_registered(BotSetting):
+    @admin.register(BotSetting)
+    class BotSettingAdmin(admin.ModelAdmin):
+        list_display = ('__str__', 'is_captcha_active')
+        editable_fields = ('is_captcha_active',)
+
 if not admin.site.is_registered(TelegramUser):
     @admin.register(TelegramUser)
     class TelegramUserAdmin(admin.ModelAdmin):
@@ -312,35 +339,33 @@ admin.site.site_header = "⚜ Mafia Habibiti"
 admin.site.index_title = "Boshqaruv paneli"
 
 # =====================================================================
-# 6. BAZANI SOZLASH (ASYNCHRONOUSLY FIXED)
+# 6. BAZANI SOZLASH (MIGRATIONS AND INITIAL DATA)
 # =====================================================================
 @sync_to_async
 def fix_missing_tables():
-    from django.db import connection
     from django.core.management import call_command
     from django.contrib.auth.models import User
 
     try:
         call_command('migrate', interactive=False)
+        logger.info("✅ Migratsiyalar muvaffaqiyatli bajarildi!")
     except Exception as e:
         logger.error(f"Migrate xatolik: {e}")
 
-    with connection.cursor() as cursor:
-        cursor.execute("CREATE TABLE IF NOT EXISTS __main___telegramuser (user_id BIGINT PRIMARY KEY, username VARCHAR(150), first_name VARCHAR(150), joined_at DATETIME NOT NULL);")
-        cursor.execute("CREATE TABLE IF NOT EXISTS __main___broadcastmessage (id INTEGER PRIMARY KEY AUTOINCREMENT, text TEXT NOT NULL, photo_url VARCHAR(200), created_at DATETIME NOT NULL, is_sent BOOLEAN NOT NULL);")
-        cursor.execute("CREATE TABLE IF NOT EXISTS __main___badword (id INTEGER PRIMARY KEY AUTOINCREMENT, word VARCHAR(100) NOT NULL UNIQUE);")
-        cursor.execute("CREATE TABLE IF NOT EXISTS __main___userwarning (user_id BIGINT PRIMARY KEY, count INTEGER NOT NULL DEFAULT 0);")
-        cursor.execute("CREATE TABLE IF NOT EXISTS __main___adminviolation (user_id BIGINT PRIMARY KEY, count INTEGER NOT NULL DEFAULT 0);")
-        cursor.execute("CREATE TABLE IF NOT EXISTS __main___userlink (user_id BIGINT PRIMARY KEY, link TEXT NOT NULL, log_msg_id BIGINT NOT NULL);")
-        cursor.execute("CREATE TABLE IF NOT EXISTS __main___invitelink (user_id BIGINT PRIMARY KEY, link TEXT NOT NULL);")
-    logger.info("✅ Jadvallar tekshirildi!")
+    # Defolt bot sozlamasini yaratish
+    try:
+        if not BotSetting.objects.exists():
+            BotSetting.objects.create(is_captcha_active=True)
+            logger.info("⚙ Standart bot sozlamalari yaratildi.")
+    except Exception as e:
+        logger.error(f"BotSetting yaratishda xatolik: {e}")
 
     try:
-        User.objects.filter(username='admin').delete()
-        User.objects.create_superuser('admin', 'admin@example.com', 'admin777')
-        logger.info("🔐 Admin yangilandi. Login: admin | Parol: admin777")
+        if not User.objects.filter(username='admin').exists():
+            User.objects.create_superuser('admin', 'admin@example.com', 'admin777')
+            logger.info("🔐 Admin foydalanuvchisi yaratildi. Login: admin | Parol: admin777")
     except Exception as e:
-        logger.error(f"Admin xatolik: {e}")
+        logger.error(f"Admin yaratishda xatolik: {e}")
 
 # =====================================================================
 # 7. URL SOZLAMALARI
@@ -380,6 +405,14 @@ urlpatterns = [
 # =====================================================================
 # 8. ORM FUNKSIYALARI (ASYNC)
 # =====================================================================
+@sync_to_async
+def is_captcha_enabled_in_db() -> bool:
+    try:
+        setting = BotSetting.objects.first()
+        return setting.is_captcha_active if setting else True
+    except Exception:
+        return True
+
 @sync_to_async
 def save_user_to_db(user_id: int, username: str, first_name: str):
     TelegramUser.objects.get_or_create(
@@ -480,7 +513,7 @@ async def send_log(text: str, user_id: int = None, unblock_button: bool = False)
     try: await bot.send_message(LOG_CHAT_ID, text, reply_markup=markup, parse_mode="HTML")
     except Exception as e: logger.error(f"Log xatolik: {e}")
 
-# Async threadpool wrapper OpenAI uchun (loyihani muzlatib qo'ymaslik maqsadida)
+# Async OpenAI tahlili
 async def analyze_image_async(file_bytes: bytes) -> bool:
     return await asyncio.to_thread(analyze_image_with_openai, file_bytes)
 
@@ -500,17 +533,24 @@ def analyze_image_with_openai(file_bytes: bytes) -> bool:
         logger.error(f"OpenAI xatolik: {e}")
         return False
 
+# 🚀 ASYNCHRONOUS IMAGE DOWNLOADER (Botni muzlatib qo'ymaydi)
 async def get_image_bytes(file_id: str) -> bytes | None:
     try:
         file = await bot.get_file(file_id)
-        response = requests.get(f"https://api.telegram.org/file/bot{TELEGRAM_TOKEN}/{file.file_path}", timeout=30)
-        if response.status_code != 200: return None
-        image = Image.open(io.BytesIO(response.content)).convert("RGB")
+        file_url = f"https://api.telegram.org/file/bot{TELEGRAM_TOKEN}/{file.file_path}"
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.get(file_url, timeout=30) as response:
+                if response.status != 200:
+                    return None
+                content = await response.read()
+                
+        image = Image.open(io.BytesIO(content)).convert("RGB")
         buf = io.BytesIO()
         image.save(buf, format="JPEG")
         return buf.getvalue()
     except Exception as e:
-        logger.error(f"Rasm yuklashda xatolik: {e}")
+        logger.error(f"Rasm yuklashda xatolik (Async): {e}")
         return None
 
 # =====================================================================
@@ -547,7 +587,7 @@ async def handle_user_penalty(message: types.Message, reason: str):
         await send_private(user_id, f"⚠️ Ogohlantirish: {count}/3. Sabab: {reason}")
 
 # =====================================================================
-# 12. CAPTCHA
+# 12. CAPTCHA MANTIG'I
 # =====================================================================
 def create_image_captcha() -> tuple[bytes, str]:
     chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
@@ -588,7 +628,6 @@ async def send_captcha(user_id: int, user_name: str):
 # =====================================================================
 @dp.message(F.text == "/start")
 async def cmd_start(message: types.Message):
-    # Har safar /start bosganda yangi user bazaga yoziladi (Rassilka bazasi shakllanishi uchun)
     await save_user_to_db(message.from_user.id, message.from_user.username, message.from_user.first_name)
     
     if message.chat.type == "private":
@@ -608,7 +647,6 @@ async def contact_admin_callback(callback: CallbackQuery):
 @dp.message(F.chat.type == "private")
 async def handle_private_message(message: types.Message):
     user_id = message.from_user.id
-    # Shaxsiy chatda har qanday xabar kelganda userni bazaga qo'shib qo'yamiz
     await save_user_to_db(user_id, message.from_user.username, message.from_user.first_name)
 
     if (message.text and message.text.startswith("/")) or user_id in captcha_pending:
@@ -710,7 +748,16 @@ async def check_media(message: types.Message):
 @dp.chat_join_request()
 async def on_join_request(update: types.ChatJoinRequest):
     if update.chat.id == MAIN_CHAT_ID:
-        await send_captcha(update.from_user.id, update.from_user.first_name)
+        # DB dagi BotSetting holatini tekshiramiz
+        captcha_active = await is_captcha_enabled_in_db()
+        if captcha_active:
+            await send_captcha(update.from_user.id, update.from_user.first_name)
+        else:
+            try:
+                await bot.approve_chat_join_request(MAIN_CHAT_ID, update.from_user.id)
+                await send_private(update.from_user.id, "✅ Guruhga xush kelibsiz! (Kaptcha tekshiruvi o'chirilgan) 🎉")
+            except Exception as e:
+                logger.error(f"To'g'ridan-to'g'ri qabul qilishda xatolik: {e}")
 
 async def setup_userbot_handlers():
     @userbot.on(events.NewMessage(incoming=True, func=lambda e: e.is_private))
@@ -757,7 +804,7 @@ async def main():
     from django.core.management import call_command
     await asyncio.to_thread(call_command, 'collectstatic', interactive=False)
     
-    # Jadvallarni tekshirish va yaratish (Xavfsiz asinxron oqimga o'tkazildi)
+    # Jadvallarni tekshirish va yaratish
     await fix_missing_tables()
     
     await userbot.start()
