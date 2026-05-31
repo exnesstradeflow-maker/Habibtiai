@@ -287,6 +287,22 @@ class InviteLink(models.Model):
     class Meta: app_label = '__main__'
 
 
+class BannedUser(models.Model):
+    user_id    = models.BigIntegerField("Telegram ID", primary_key=True)
+    username   = models.CharField("Username", max_length=150, null=True, blank=True)
+    first_name = models.CharField("Ismi", max_length=150, null=True, blank=True)
+    reason     = models.CharField("Sabab", max_length=300, null=True, blank=True)
+    banned_at  = models.DateTimeField("Ban vaqti", auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.first_name or 'User'} ({self.user_id})"
+
+    class Meta:
+        app_label = '__main__'
+        verbose_name = "Hafli foydalanuvchi"
+        verbose_name_plural = "🚨 Hafli Foydalanuvchilar (Permanent Ban)"
+
+
 # =====================================================================
 # 5. ADMIN REGISTRATSIYA
 # =====================================================================
@@ -339,6 +355,14 @@ if not admin.site.is_registered(AdminViolation):
     @admin.register(AdminViolation)
     class AdminViolationAdmin(admin.ModelAdmin):
         list_display, search_fields, ordering, list_per_page = ('user_id', 'count'), ('user_id',), ('-count',), 25
+
+if not admin.site.is_registered(BannedUser):
+    @admin.register(BannedUser)
+    class BannedUserAdmin(admin.ModelAdmin):
+        list_display  = ('user_id', 'username', 'first_name', 'reason', 'banned_at')
+        search_fields = ('user_id', 'username', 'first_name')
+        ordering      = ('-banned_at',)
+        list_per_page = 25
 
 admin.site.site_header = "⚜ Mafia Habibiti"
 admin.site.index_title = "Boshqaruv paneli"
@@ -499,6 +523,10 @@ def get_invite_link(user_id: int):
 @sync_to_async
 def set_invite_link(user_id: int, link: str):
     InviteLink.objects.update_or_create(user_id=user_id, defaults={'link': link})
+
+@sync_to_async
+def is_permanently_banned(user_id: int) -> bool:
+    return BannedUser.objects.filter(user_id=user_id).exists()
 
 # =====================================================================
 # 9. BOT INSTANCELARI
@@ -775,6 +803,15 @@ async def check_media(message: types.Message):
 @dp.chat_join_request()
 async def on_join_request(update: types.ChatJoinRequest):
     if update.chat.id == MAIN_CHAT_ID:
+        # Hafli foydalanuvchi ekanligini tekshir
+        if await is_permanently_banned(update.from_user.id):
+            try:
+                await bot.decline_chat_join_request(MAIN_CHAT_ID, update.from_user.id)
+                await bot.ban_chat_member(chat_id=MAIN_CHAT_ID, user_id=update.from_user.id)
+            except Exception as e:
+                logger.error(f"Hafli user join rad etishda xatolik: {e}")
+            return
+
         # DB dagi BotSetting holatini tekshiramiz
         captcha_active = await is_captcha_enabled_in_db()
         if captcha_active:
@@ -785,6 +822,34 @@ async def on_join_request(update: types.ChatJoinRequest):
                 await send_private(update.from_user.id, "✅ Guruhga xush kelibsiz! (Kaptcha tekshiruvi o'chirilgan) 🎉")
             except Exception as e:
                 logger.error(f"To'g'ridan-to'g'ri qabul qilishda xatolik: {e}")
+
+
+@dp.chat_member()
+async def on_chat_member_update(update: types.ChatMemberUpdated):
+    """Kimdir hafli userni unban qilsa — darhol qayta ban."""
+    if update.chat.id != MAIN_CHAT_ID:
+        return
+
+    old_status = update.old_chat_member.status
+    new_status = update.new_chat_member.status
+    user_id    = update.new_chat_member.user.id
+
+    # unban = "restricted" yoki "member" ga o'tish holatlari
+    was_banned = old_status in ("kicked", "restricted")
+    now_free   = new_status in ("member", "administrator", "creator", "restricted", "left")
+
+    if was_banned and now_free:
+        if await is_permanently_banned(user_id):
+            try:
+                await bot.ban_chat_member(chat_id=MAIN_CHAT_ID, user_id=user_id)
+                logger.warning(f"🚨 Hafli user {user_id} qayta ban qilindi (kimdir unban qildi).")
+                await send_log(
+                    f"🚨 <b>Hafli user qayta ban!</b>\n"
+                    f"👤 {update.new_chat_member.user.first_name} — <code>{user_id}</code>\n"
+                    f"⚡ Kimdir unban qildi — bot qayta ban qildi."
+                )
+            except Exception as e:
+                logger.error(f"Hafli user qayta ban xatolik: {e}")
 
 
 # =====================================================================
@@ -824,7 +889,7 @@ async def main():
     logger.info("🤖 BOT VA DJANGO ADMIN TAYYOR!")
 
     await asyncio.gather(
-        dp.start_polling(bot),
+        dp.start_polling(bot, allowed_updates=["message", "callback_query", "chat_join_request", "chat_member"]),
         run_django_web_server()
     )
 
