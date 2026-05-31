@@ -10,8 +10,6 @@ import aiohttp
 from PIL import Image, ImageDraw, ImageFont
 from dotenv import load_dotenv
 from openai import OpenAI
-from telethon import TelegramClient, events
-from telethon.sessions import StringSession
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from asgiref.sync import sync_to_async
@@ -24,9 +22,6 @@ load_dotenv()
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-API_ID = int(os.getenv("API_ID", 0))
-API_HASH = os.getenv("API_HASH")
-SESSION_STR = os.getenv("SESSION_STR")
 
 MAIN_CHAT_ID = int(os.getenv("MAIN_CHAT_ID", 0))
 LOG_CHAT_ID = int(os.getenv("LOG_CHAT_ID", 0))
@@ -516,7 +511,6 @@ openai_client = OpenAI(api_key=OPENAI_API_KEY)
 bot     = Bot(token=TELEGRAM_TOKEN)
 log_bot = Bot(token=LOG_BOT_TOKEN)
 dp      = Dispatcher()
-userbot = TelegramClient(StringSession(SESSION_STR), API_ID, API_HASH)
 
 captcha_pending  = {}
 user_to_support  = {}
@@ -538,9 +532,8 @@ async def is_admin(chat_id: int, user_id: int) -> bool:
 async def send_private(user_id: int, text: str, reply_markup=None):
     try:
         await bot.send_message(user_id, text, reply_markup=reply_markup, parse_mode="HTML")
-    except Exception:
-        try: await userbot.send_message(user_id, text)
-        except Exception as e: logger.error(f"Shaxsiy xabar yuborib bo'lmadi: {e}")
+    except Exception as e:
+        logger.error(f"Shaxsiy xabar yuborib bo'lmadi: {e}")
 
 async def send_log(text: str, user_id: int = None, unblock_button: bool = False):
     markup = None
@@ -658,7 +651,7 @@ async def send_captcha(user_id: int, user_name: str):
     try:
         captcha_file = io.BytesIO(img_bytes)
         captcha_file.name = "captcha.png"
-        await userbot.send_file(user_id, captcha_file, caption=f"Salom, {user_name}! 👋\n🤖 Rasm ichidagi kodni yozib yuboring!\n⏳ Vaqt: 60 soniya.")
+        await bot.send_photo(user_id, captcha_file, caption=f"Salom, {user_name}! 👋\n🤖 Rasm ichidagi kodni yozib yuboring!\n⏳ Vaqt: 60 soniya.")
     except Exception as e: logger.error(f"Captcha yuborishda xatolik: {e}")
 
 # =====================================================================
@@ -797,23 +790,6 @@ async def on_join_request(update: types.ChatJoinRequest):
             except Exception as e:
                 logger.error(f"To'g'ridan-to'g'ri qabul qilishda xatolik: {e}")
 
-async def setup_userbot_handlers():
-    @userbot.on(events.NewMessage(incoming=True, func=lambda e: e.is_private))
-    async def on_captcha_reply(event):
-        user_id = event.sender_id
-        if user_id not in captcha_pending: return
-        if event.text.strip().upper() == captcha_pending[user_id]["code"]:
-            captcha_pending[user_id]["task"].cancel()
-            del captcha_pending[user_id]
-            try:
-                await bot.approve_chat_join_request(MAIN_CHAT_ID, user_id)
-                await send_private(user_id, "✅ Guruhga xush kelibsiz! 🎉")
-            except Exception as e: logger.error(f"Approve xatolik: {e}")
-        else:
-            captcha_pending[user_id]["task"].cancel()
-            del captcha_pending[user_id]
-            try: await bot.decline_chat_join_request(MAIN_CHAT_ID, user_id)
-            except Exception: pass
 
 # =====================================================================
 # 14. DJANGO WEB SERVER
@@ -849,13 +825,10 @@ async def main():
     # Jadvallarni tekshirish va yaratish
     await fix_missing_tables()
     
-    await userbot.start()
-    await setup_userbot_handlers()
     logger.info("🤖 BOT VA DJANGO ADMIN TAYYOR!")
 
     await asyncio.gather(
         dp.start_polling(bot),
-        userbot.run_until_disconnected(),
         run_django_web_server()
     )
 
