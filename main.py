@@ -230,13 +230,22 @@ class BroadcastMessage(models.Model):
         is_new = self.pk is None
         super().save(*args, **kwargs)
         if is_new and not self.is_sent:
-            asyncio.run_coroutine_threadsafe(self.start_broadcast(), asyncio.get_event_loop())
+            # asyncio.get_event_loop() Django thread pool ichida ishlamaydi.
+            # Global _main_loop o'zgaruvchisini ishlatamiz (main() da saqlanadi).
+            try:
+                loop = _main_loop
+                if loop and loop.is_running():
+                    asyncio.run_coroutine_threadsafe(self.start_broadcast(), loop)
+                else:
+                    logger.error("❌ Rassilka: asosiy event loop topilmadi!")
+            except Exception as e:
+                logger.error(f"❌ Rassilka ishga tushirishda xatolik: {e}")
 
     async def start_broadcast(self):
-        await asyncio.sleep(2) 
+        await asyncio.sleep(2)
         users = await sync_to_async(list)(TelegramUser.objects.all())
         logger.info(f"📢 Rassilka boshlandi. Jami foydalanuvchilar: {len(users)}")
-        
+
         success, failed = 0, 0
         for u in users:
             try:
@@ -245,11 +254,11 @@ class BroadcastMessage(models.Model):
                 else:
                     await bot.send_message(chat_id=u.user_id, text=self.text, parse_mode="HTML")
                 success += 1
-                await asyncio.sleep(0.05) 
+                await asyncio.sleep(0.05)
             except Exception as e:
                 failed += 1
                 logger.error(f"Rassilka xatolik user {u.user_id}: {e}")
-        
+
         await sync_to_async(BroadcastMessage.objects.filter(pk=self.pk).update)(is_sent=True)
         logger.info(f"📢 Rassilka yakunlandi! Muvaffaqiyatli: {success}, Xatolik: {failed}")
 
@@ -508,6 +517,9 @@ captcha_pending  = {}
 user_to_support  = {}
 support_to_user  = {}
 waiting_support  = set()
+
+# Rassilka uchun global event loop (Django thread pool ichidan foydalanish uchun)
+_main_loop: asyncio.AbstractEventLoop | None = None
 
 # =====================================================================
 # 10. YORDAMCHI FUNKSIYALAR
@@ -819,8 +831,12 @@ async def run_django_web_server():
 # MAIN
 # =====================================================================
 async def main():
+    global _main_loop
     logger.info("🚀 TIZIM ISHGA TUSHMOQDA...")
-    
+
+    # Global event loopni saqlaymiz (BroadcastMessage.save() uchun)
+    _main_loop = asyncio.get_event_loop()
+
     # 🚀 RAILWAY ISHGA TUSHGANDA JAZZMIN STILLARINI AVTOMATIK YIG'ISH
     from django.core.management import call_command
     await asyncio.to_thread(call_command, 'collectstatic', interactive=False)
