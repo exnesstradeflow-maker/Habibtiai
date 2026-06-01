@@ -875,20 +875,75 @@ async def get_image_bytes(file_id: str) -> bytes | None:
     try:
         file = await bot.get_file(file_id)
         file_url = f"https://api.telegram.org/file/bot{TELEGRAM_TOKEN}/{file.file_path}"
-        
+
         async with aiohttp.ClientSession() as session:
-            async with session.get(file_url, timeout=30) as response:
+            async with session.get(file_url, timeout=aiohttp.ClientTimeout(total=30)) as response:
                 if response.status != 200:
                     return None
                 content = await response.read()
-                
-        image = Image.open(io.BytesIO(content)).convert("RGB")
+
+        # Har qanday formatni (WebP, TGS thumbnail, GIF kadr, PNG) JPEG ga o'tkazamiz
+        try:
+            image = Image.open(io.BytesIO(content)).convert("RGB")
+        except Exception:
+            # GIF bo'lsa birinchi kadrni olamiz
+            try:
+                gif = Image.open(io.BytesIO(content))
+                gif.seek(0)
+                image = gif.convert("RGB")
+            except Exception as e:
+                logger.error(f"Rasm ochib bo'lmadi: {e}")
+                return None
+
         buf = io.BytesIO()
         image.save(buf, format="JPEG")
         return buf.getvalue()
     except Exception as e:
         logger.error(f"Rasm yuklashda xatolik (Async): {e}")
         return None
+
+
+async def get_thumbnail_bytes(message: types.Message) -> bytes | None:
+    """
+    Har qanday media turidan (photo, video, sticker, animation, video_note)
+    tahlil uchun rasm baytlarini qaytaradi.
+    Animatsiyali / video stiker uchun thumbnail ishlatiladi.
+    """
+    try:
+        # --- Rasm ---
+        if message.photo:
+            return await get_image_bytes(message.photo[-1].file_id)
+
+        # --- Video / video_note ---
+        if message.video and message.video.thumbnail:
+            return await get_image_bytes(message.video.thumbnail.file_id)
+        if message.video_note and message.video_note.thumbnail:
+            return await get_image_bytes(message.video_note.thumbnail.file_id)
+
+        # --- GIF (animation) ---
+        if message.animation:
+            # Avval thumbnail sinab ko'r
+            if message.animation.thumbnail:
+                result = await get_image_bytes(message.animation.thumbnail.file_id)
+                if result:
+                    return result
+            # Thumbnail yo'q bo'lsa to'g'ridan faylni yuklab GIF ning 1-kadrini olamiz
+            return await get_image_bytes(message.animation.file_id)
+
+        # --- Stiker (oddiy WebP, animatsiyali TGS, video stiker) ---
+        if message.sticker:
+            # Video stiker yoki animatsiyali stikerning thumbnail'i bor
+            if message.sticker.thumbnail:
+                result = await get_image_bytes(message.sticker.thumbnail.file_id)
+                if result:
+                    return result
+            # Oddiy WebP stikerni to'g'ridan yuklaymiz
+            if not message.sticker.is_animated and not message.sticker.is_video:
+                return await get_image_bytes(message.sticker.file_id)
+
+    except Exception as e:
+        logger.error(f"Thumbnail olishda xatolik: {e}")
+    return None
 
 # =====================================================================
 # 11. JAZOLASH
@@ -1574,33 +1629,49 @@ async def unblock_user(callback: CallbackQuery):
 
 @dp.message(F.chat.id == MAIN_CHAT_ID, F.text)
 async def check_text(message: types.Message):
+    # Admin xabarlarini tekshirma
+    if await is_admin(MAIN_CHAT_ID, message.from_user.id):
+        return
     if await check_bad_words_in_db(message.text):
         await handle_user_penalty(message, reason="So'kinish")
 
 @dp.message(F.chat.id == MAIN_CHAT_ID, F.photo)
 async def check_photo(message: types.Message):
-    image_bytes = await get_image_bytes(message.photo[-1].file_id)
+    # Admin rasmlarini tekshirma
+    if await is_admin(MAIN_CHAT_ID, message.from_user.id):
+        return
+    image_bytes = await get_thumbnail_bytes(message)
     if image_bytes and await analyze_image_async(image_bytes):
         await handle_user_penalty(message, reason="Odobsiz rasm")
 
 @dp.message(F.chat.id == MAIN_CHAT_ID, F.video | F.video_note)
 async def check_video(message: types.Message):
-    thumb = message.video.thumbnail if message.video else message.video_note.thumbnail
-    if thumb:
-        image_bytes = await get_image_bytes(thumb.file_id)
-        if image_bytes and await analyze_image_async(image_bytes):
-            await handle_user_penalty(message, reason="Odobsiz video")
+    # Admin videolarini tekshirma
+    if await is_admin(MAIN_CHAT_ID, message.from_user.id):
+        return
+    image_bytes = await get_thumbnail_bytes(message)
+    if image_bytes and await analyze_image_async(image_bytes):
+        await handle_user_penalty(message, reason="Odobsiz video")
 
-@dp.message(F.chat.id == MAIN_CHAT_ID, F.sticker | F.animation)
-async def check_media(message: types.Message):
-    file_id = None
-    if message.animation: file_id = message.animation.file_id
-    elif message.sticker and not message.sticker.is_animated: file_id = message.sticker.file_id
-    elif message.sticker and message.sticker.thumbnail: file_id = message.sticker.thumbnail.file_id
-    if file_id:
-        image_bytes = await get_image_bytes(file_id)
-        if image_bytes and await analyze_image_async(image_bytes):
-            await handle_user_penalty(message, reason="Odobsiz media")
+@dp.message(F.chat.id == MAIN_CHAT_ID, F.animation)
+async def check_animation(message: types.Message):
+    """GIF va animatsiyali xabarlarni tekshiradi."""
+    # Admin GIF/animatsiyalarini tekshirma
+    if await is_admin(MAIN_CHAT_ID, message.from_user.id):
+        return
+    image_bytes = await get_thumbnail_bytes(message)
+    if image_bytes and await analyze_image_async(image_bytes):
+        await handle_user_penalty(message, reason="Odobsiz GIF/animatsiya")
+
+@dp.message(F.chat.id == MAIN_CHAT_ID, F.sticker)
+async def check_sticker(message: types.Message):
+    """Barcha stiker turlarini (oddiy, animatsiyali, video) tekshiradi."""
+    # Admin stikerlarini tekshirma
+    if await is_admin(MAIN_CHAT_ID, message.from_user.id):
+        return
+    image_bytes = await get_thumbnail_bytes(message)
+    if image_bytes and await analyze_image_async(image_bytes):
+        await handle_user_penalty(message, reason="Odobsiz stiker")
 
 @dp.chat_join_request()
 async def on_join_request(update: types.ChatJoinRequest):
