@@ -1211,7 +1211,21 @@ async def cmd_unban(message: types.Message):
 
     admin_name = message.from_user.first_name or "Admin"
     try:
-        await bot.unban_chat_member(chat_id=MAIN_CHAT_ID, user_id=user_id, only_if_banned=True)
+        # Avval guruhda holat tekshiramiz
+        try:
+            member = await bot.get_chat_member(MAIN_CHAT_ID, user_id)
+            status = member.status
+        except Exception:
+            status = "kicked"  # Telegram topsa ham, topilmasa ham ban deb faraz qilamiz
+
+        if status not in ("kicked", "restricted", "left"):
+            return await message.reply(
+                f"ℹ️ <b>{first_name}</b> allaqachon guruhda yoki ban emas.",
+                parse_mode="HTML"
+            )
+
+        # only_if_banned=False — chunki "left" statusli ban ham bo'lishi mumkin
+        await bot.unban_chat_member(chat_id=MAIN_CHAT_ID, user_id=user_id, only_if_banned=False)
         await message.reply(f"✅ <b>{first_name}</b> ban olib tashlandi!", parse_mode="HTML")
         await send_log(
             f"✅ <b>Unban:</b>\n👤 {first_name} — <code>{user_id}</code>",
@@ -1457,8 +1471,14 @@ async def mod_callback_handler(callback: CallbackQuery):
         )
 
     elif action == "unban":
-        await bot.unban_chat_member(chat_id=MAIN_CHAT_ID, user_id=user_id, only_if_banned=True)
-        await callback.message.edit_reply_markup(reply_markup=mod_buttons(user_id, 0))
+        try:
+            await bot.unban_chat_member(chat_id=MAIN_CHAT_ID, user_id=user_id, only_if_banned=False)
+        except Exception as unban_err:
+            logger.warning(f"Unban (tugma) muammo: {unban_err}")
+        try:
+            await callback.message.edit_reply_markup(reply_markup=mod_buttons(user_id, 0))
+        except Exception:
+            pass
         await callback.answer(f"✅ {first_name} unban qilindi!")
         await send_log(
             f"✅ <b>Unban (tugma):</b>\n👤 {first_name} — <code>{user_id}</code>",
@@ -1616,16 +1636,26 @@ async def cancel_link_callback(callback: CallbackQuery):
 async def unblock_user(callback: CallbackQuery):
     user_id = int(callback.data.split("_")[1])
     try:
-        await bot.unban_chat_member(chat_id=MAIN_CHAT_ID, user_id=user_id)
+        # only_if_banned=False — guruhda bo'lmagan / left bo'lgan userlarni ham unban qiladi
+        await bot.unban_chat_member(chat_id=MAIN_CHAT_ID, user_id=user_id, only_if_banned=False)
         link = await get_invite_link(user_id)
         if not link:
             invite = await bot.create_chat_invite_link(chat_id=MAIN_CHAT_ID, member_limit=1)
             link = invite.invite_link
             await set_invite_link(user_id, link)
         await send_private(user_id, f"✅ Blokdan chiqdingiz. Havola:\n\n{link}")
-        await callback.message.edit_reply_markup(reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="✅ Blokdan chiqarildi", callback_data="done")]]))
+        try:
+            await callback.message.edit_reply_markup(
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
+                    InlineKeyboardButton(text="✅ Blokdan chiqarildi", callback_data="done")
+                ]])
+            )
+        except Exception:
+            pass
         await callback.answer("✅ Bajarildi")
-    except Exception as e: logger.error(f"Unblock xatolik: {e}")
+    except Exception as e:
+        logger.error(f"Unblock xatolik: {e}")
+        await callback.answer(f"❌ Xatolik: {e}", show_alert=True)
 
 @dp.message(F.chat.id == MAIN_CHAT_ID, F.text)
 async def check_text(message: types.Message):
