@@ -208,7 +208,12 @@ if not settings.configured:
 class BotSetting(models.Model):
     is_captcha_active      = models.BooleanField("Kaptcha faolmi? / Активна ли каптча?", default=True)
     is_link_active         = models.BooleanField("Havola olish faolmi? / Активна ли кнопка ссылки?", default=True)
-    is_join_request_active = models.BooleanField("Arizalarni qabul qilsinmi? / Принимать заявки?", default=True)
+    is_join_request_active   = models.BooleanField("Arizalarni qabul qilsinmi? / Принимать заявки?", default=True)
+    is_subscription_active   = models.BooleanField(
+        "Botga /start bosmaganlar yoza olmasinmi? / Блокировать незарегистрированных?",
+        default=False,
+        help_text="Yoqilsa — botga /start bosmagan foydalanuvchilar guruhda yoza olmaydi."
+    )
 
     class Meta:
         app_label = '__main__'
@@ -436,16 +441,17 @@ class GroupMessage(models.Model):
 if not admin.site.is_registered(BotSetting):
     @admin.register(BotSetting)
     class BotSettingAdmin(admin.ModelAdmin):
-        list_display  = ('__str__', 'is_captcha_active', 'is_link_active', 'is_join_request_active')
+        list_display  = ('__str__', 'is_captcha_active', 'is_link_active', 'is_join_request_active', 'is_subscription_active')
         fieldsets = (
             ("⚙️ Bot Sozlamalari", {
-                'fields': ('is_captcha_active', 'is_link_active', 'is_join_request_active'),
+                'fields': ('is_captcha_active', 'is_link_active', 'is_join_request_active', 'is_subscription_active'),
                 'description': (
                     '<p style="color:#ffd700; font-size:13px;">'
                     '⚙️ Bu yerda botning asosiy funksiyalarini yoqib/o\'chirishingiz mumkin.<br>'
                     '🔐 <b>Kaptcha</b> — Guruhga kirmoqchi bo\'lganlar uchun rasm-kod tekshiruvi.<br>'
                     '🔗 <b>Havola olish</b> — Foydalanuvchilar bot orqali guruhga link ola olishi.<br>'
-                    '🚪 <b>Arizalarni qabul qilish</b> — Guruhga qo\'shilish arizalarini avtomatik qabul/rad qilish.'
+                    '🚪 <b>Arizalarni qabul qilish</b> — Guruhga qo\'shilish arizalarini avtomatik qabul/rad qilish.<br>'
+                    '🤖 <b>Bot start tekshiruvi</b> — Botga /start bosmagan foydalanuvchilar guruhda yoza olmaydi.'
                     '</p>'
                 )
             }),
@@ -665,7 +671,7 @@ def fix_missing_tables():
     # 3. Defolt bot sozlamasini yaratish
     try:
         if not BotSetting.objects.exists():
-            BotSetting.objects.create(is_captcha_active=True, is_link_active=True, is_join_request_active=True)
+            BotSetting.objects.create(is_captcha_active=True, is_link_active=True, is_join_request_active=True, is_subscription_active=False)
             logger.info("Standart bot sozlamalari yaratildi.")
         else:
             # Mavjud yozuvda is_link_active None bo'lishi mumkin -- True ga o'rnat
@@ -743,6 +749,21 @@ def is_join_request_enabled_in_db() -> bool:
         return True
 
 @sync_to_async
+def get_subscription_settings():
+    try:
+        s = BotSetting.objects.first()
+        if not s:
+            return False
+        return s.is_subscription_active
+    except Exception:
+        return False
+
+@sync_to_async
+def user_has_started_bot(user_id: int) -> bool:
+    """Foydalanuvchi avval /start bosganmi? TelegramUser jadvalida bor/yo'qligini tekshiradi."""
+    return TelegramUser.objects.filter(user_id=user_id).exists()
+
+@sync_to_async
 def is_bot_admin(user_id: int) -> bool:
     try:
         return BotAdmin.objects.filter(user_id=user_id).exists()
@@ -759,6 +780,7 @@ def get_bot_settings_status():
             "captcha":       setting.is_captcha_active,
             "link":          setting.is_link_active,
             "join_request":  setting.is_join_request_active,
+            "subscription":  setting.is_subscription_active,
         }
     except Exception:
         return {"captcha": True, "link": True}
@@ -1089,7 +1111,20 @@ async def get_target_user(message: types.Message):
 # ─────────────────────────────────────────────────────────────────────
 @sync_to_async
 def get_all_warnings() -> list:
-    return list(UserWarning.objects.filter(count__gt=0).order_by('-count').values('user_id', 'count'))
+    rows = list(UserWarning.objects.filter(count__gt=0).order_by('-count').values('user_id', 'count'))
+    result = []
+    for row in rows:
+        try:
+            u = TelegramUser.objects.filter(user_id=row['user_id']).values('first_name', 'username').first()
+        except Exception:
+            u = None
+        result.append({
+            'user_id':    row['user_id'],
+            'count':      row['count'],
+            'first_name': (u['first_name'] if u else None) or "Noma'lum",
+            'username':   (u['username']   if u else None),
+        })
+    return result
 
 @dp.message(F.text.startswith("/warns"), F.chat.id == MAIN_CHAT_ID)
 async def cmd_warns_list(message: types.Message):
@@ -1102,7 +1137,11 @@ async def cmd_warns_list(message: types.Message):
 
     lines = ["📋 <b>Ogohlantirish jadvali:</b>\n"]
     for i, w in enumerate(warnings, 1):
-        lines.append(f"{i}. ID <code>{w['user_id']}</code> — <b>{w['count']}/3</b> ogohlantirish")
+        username_part = f" @{w['username']}" if w['username'] else ""
+        lines.append(
+            f"{i}. <b>{w['first_name']}</b>{username_part}\n"
+            f"   🆔 <code>{w['user_id']}</code> — <b>{w['count']}/3</b> ogohlantirish"
+        )
     await message.reply("\n".join(lines), parse_mode="HTML")
 
 # ─────────────────────────────────────────────────────────────────────
@@ -1568,11 +1607,60 @@ async def cmd_status(message: types.Message):
         f"🤖 <b>Kaptcha tekshiruvi:</b>  {icon(status['captcha'])}\n"
         f"🔗 <b>Havola olish (link):</b> {icon(status['link'])}\n"
         f"🚪 <b>Ariza qabul qilish:</b>   {icon(status['join_request'])}\n"
+        f"🤖 <b>Bot start tekshiruvi:</b>  {icon(status['subscription'])}\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
         "🛠 Sozlamalarni o'zgartirish uchun:\n"
         "<b>Admin panel → ⚙ Bot Sozlamalari</b>"
     )
     await message.answer(text, parse_mode="HTML")
+
+
+@dp.message(F.text.startswith("/info"), F.chat.id == MAIN_CHAT_ID)
+async def cmd_info(message: types.Message):
+    """Foydalanuvchi haqida ma'lumot: /info reply | /info @username | /info ID"""
+    if not await is_admin(MAIN_CHAT_ID, message.from_user.id):
+        return
+
+    user_id, _ = await get_target_user(message)
+    if not user_id:
+        return await message.reply("❗ Reply qiling yoki /info @username / ID yozing.")
+
+    @sync_to_async
+    def fetch_info(uid):
+        try:
+            u = TelegramUser.objects.get(user_id=uid)
+            w = UserWarning.objects.filter(user_id=uid).first()
+            return {
+                "found":      True,
+                "first_name": u.first_name or "Noma'lum",
+                "username":   u.username,
+                "joined_at":  u.joined_at.strftime("%Y-%m-%d %H:%M"),
+                "warnings":   w.count if w else 0,
+            }
+        except TelegramUser.DoesNotExist:
+            return {"found": False}
+
+    info = await fetch_info(user_id)
+
+    if not info["found"]:
+        return await message.reply(
+            f"ℹ️ ID <code>{user_id}</code> bazada topilmadi.\n"
+            f"(Foydalanuvchi botni hali ishlatmagan bo'lishi mumkin)",
+            parse_mode="HTML"
+        )
+
+    username_line = f"@{info['username']}" if info['username'] else "—"
+    text = (
+        f"👤 <b>Foydalanuvchi ma'lumotlari</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"📛 <b>Ismi:</b> {info['first_name']}\n"
+        f"🔖 <b>Username:</b> {username_line}\n"
+        f"🆔 <b>ID:</b> <code>{user_id}</code>\n"
+        f"📅 <b>Guruhga qo'shilgan:</b> {info['joined_at']}\n"
+        f"⚠️ <b>Ogohlantirishlar:</b> {info['warnings']}/3\n"
+        f"━━━━━━━━━━━━━━━━━━━━"
+    )
+    await message.reply(text, parse_mode="HTML")
 
 
 @dp.message(F.text == "/start")
@@ -1689,11 +1777,46 @@ async def unblock_user(callback: CallbackQuery):
         logger.error(f"Unblock xatolik: {e}")
         await callback.answer(f"❌ Xatolik: {e}", show_alert=True)
 
+async def check_subscription(user_id: int) -> bool:
+    """Foydalanuvchi botga /start bosganmi? True = start bosgan yoki tekshiruv o'chirilgan."""
+    sub_active = await get_subscription_settings()
+    if not sub_active:
+        return True
+    return await user_has_started_bot(user_id)
+
+
 @dp.message(F.chat.id == MAIN_CHAT_ID, F.text)
 async def check_text(message: types.Message):
     # Admin xabarlarini tekshirma
     if await is_admin(MAIN_CHAT_ID, message.from_user.id):
         return
+
+    # Bot start tekshiruvi — /start bosmagan bo'lsa yozishni chekla
+    if not await check_subscription(message.from_user.id):
+        try:
+            await message.delete()
+        except Exception:
+            pass
+        bot_info = await bot.get_me()
+        bot_link = f"https://t.me/{bot_info.username}"
+        kb = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="🤖 Botga o'tish", url=bot_link),
+        ]])
+        sent = await bot.send_message(
+            message.chat.id,
+            f"⚠️ <b>{message.from_user.first_name}</b>, guruhda yozish uchun\n"
+            f"avval botga <b>/start</b> bosing!",
+            parse_mode="HTML",
+            reply_markup=kb
+        )
+        # 10 soniyadan so'ng bu xabarni ham o'chiramiz
+        await asyncio.sleep(10)
+        try:
+            await sent.delete()
+        except Exception:
+            pass
+        return
+
     if await check_bad_words_in_db(message.text):
         await handle_user_penalty(message, reason="So'kinish")
 
@@ -1702,6 +1825,32 @@ async def check_photo(message: types.Message):
     # Admin rasmlarini tekshirma
     if await is_admin(MAIN_CHAT_ID, message.from_user.id):
         return
+
+    # Bot start tekshiruvi — /start bosmagan bo'lsa yozishni chekla
+    if not await check_subscription(message.from_user.id):
+        try:
+            await message.delete()
+        except Exception:
+            pass
+        bot_info = await bot.get_me()
+        bot_link = f"https://t.me/{bot_info.username}"
+        kb = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="🤖 Botga o'tish", url=bot_link),
+        ]])
+        sent = await bot.send_message(
+            message.chat.id,
+            f"⚠️ <b>{message.from_user.first_name}</b>, guruhda yozish uchun\n"
+            f"avval botga <b>/start</b> bosing!",
+            parse_mode="HTML",
+            reply_markup=kb
+        )
+        await asyncio.sleep(10)
+        try:
+            await sent.delete()
+        except Exception:
+            pass
+        return
+
     image_bytes = await get_thumbnail_bytes(message)
     if image_bytes and await analyze_image_async(image_bytes):
         await handle_user_penalty(message, reason="Odobsiz rasm")
@@ -1711,6 +1860,32 @@ async def check_video(message: types.Message):
     # Admin videolarini tekshirma
     if await is_admin(MAIN_CHAT_ID, message.from_user.id):
         return
+
+    # Bot start tekshiruvi — /start bosmagan bo'lsa yozishni chekla
+    if not await check_subscription(message.from_user.id):
+        try:
+            await message.delete()
+        except Exception:
+            pass
+        bot_info = await bot.get_me()
+        bot_link = f"https://t.me/{bot_info.username}"
+        kb = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="🤖 Botga o'tish", url=bot_link),
+        ]])
+        sent = await bot.send_message(
+            message.chat.id,
+            f"⚠️ <b>{message.from_user.first_name}</b>, guruhda yozish uchun\n"
+            f"avval botga <b>/start</b> bosing!",
+            parse_mode="HTML",
+            reply_markup=kb
+        )
+        await asyncio.sleep(10)
+        try:
+            await sent.delete()
+        except Exception:
+            pass
+        return
+
     image_bytes = await get_thumbnail_bytes(message)
     if image_bytes and await analyze_image_async(image_bytes):
         await handle_user_penalty(message, reason="Odobsiz video")
@@ -1721,6 +1896,32 @@ async def check_animation(message: types.Message):
     # Admin GIF/animatsiyalarini tekshirma
     if await is_admin(MAIN_CHAT_ID, message.from_user.id):
         return
+
+    # Bot start tekshiruvi — /start bosmagan bo'lsa yozishni chekla
+    if not await check_subscription(message.from_user.id):
+        try:
+            await message.delete()
+        except Exception:
+            pass
+        bot_info = await bot.get_me()
+        bot_link = f"https://t.me/{bot_info.username}"
+        kb = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="\U0001f916 Botga o'tish", url=bot_link),
+        ]])
+        sent = await bot.send_message(
+            message.chat.id,
+            f"\u26a0\ufe0f <b>{message.from_user.first_name}</b>, guruhda yozish uchun\n"
+            f"avval botga <b>/start</b> bosing!",
+            parse_mode="HTML",
+            reply_markup=kb
+        )
+        await asyncio.sleep(10)
+        try:
+            await sent.delete()
+        except Exception:
+            pass
+        return
+
     image_bytes = await get_thumbnail_bytes(message)
     if image_bytes and await analyze_image_async(image_bytes):
         await handle_user_penalty(message, reason="Odobsiz GIF/animatsiya")
@@ -1731,6 +1932,32 @@ async def check_sticker(message: types.Message):
     # Admin stikerlarini tekshirma
     if await is_admin(MAIN_CHAT_ID, message.from_user.id):
         return
+
+    # Bot start tekshiruvi — /start bosmagan bo'lsa yozishni chekla
+    if not await check_subscription(message.from_user.id):
+        try:
+            await message.delete()
+        except Exception:
+            pass
+        bot_info = await bot.get_me()
+        bot_link = f"https://t.me/{bot_info.username}"
+        kb = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="\U0001f916 Botga o'tish", url=bot_link),
+        ]])
+        sent = await bot.send_message(
+            message.chat.id,
+            f"\u26a0\ufe0f <b>{message.from_user.first_name}</b>, guruhda yozish uchun\n"
+            f"avval botga <b>/start</b> bosing!",
+            parse_mode="HTML",
+            reply_markup=kb
+        )
+        await asyncio.sleep(10)
+        try:
+            await sent.delete()
+        except Exception:
+            pass
+        return
+
     image_bytes = await get_thumbnail_bytes(message)
     if image_bytes and await analyze_image_async(image_bytes):
         await handle_user_penalty(message, reason="Odobsiz stiker")
@@ -1755,7 +1982,7 @@ async def on_join_request(update: types.ChatJoinRequest):
                 await send_private(
                     update.from_user.id,
                     "❌ Guruhga kirish hozircha yopiq.\n"
-                    "Admin bilan bog'laning: @samir_axii"
+                    "Admin bilan bog'laning: @admin"
                 )
             except Exception as e:
                 logger.error(f"Ariza rad etishda xatolik: {e}")
