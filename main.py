@@ -39,6 +39,17 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Django ASGI + whitenoise StreamingHttpResponse ogohlantirishini jimlatamiz
+# (bot ishiga ta'sir qilmaydi, faqat shovqinli log)
+import warnings
+warnings.filterwarnings(
+    "ignore",
+    message="StreamingHttpResponse must consume synchronous iterators",
+    category=Warning,
+)
+logging.getLogger("django.request").setLevel(logging.ERROR)
+logging.getLogger("django.server").setLevel(logging.ERROR)
+
 # =====================================================================
 # 3. DJANGO SOZLAMALARI — MAFIA HABIBITI PREMIUM DARK GOLD DIZAYN
 # =====================================================================
