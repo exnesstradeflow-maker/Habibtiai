@@ -705,6 +705,424 @@ async def send_captcha(user_id: int, user_name: str):
 # =====================================================================
 # 13. AIOGRAM HANDLERS
 # =====================================================================
+
+# ─────────────────────────────────────────────────────────────────────
+# MODERATSIYA YORDAMCHI FUNKSIYALARI
+# ─────────────────────────────────────────────────────────────────────
+def mod_buttons(user_id: int, warn_count: int) -> InlineKeyboardMarkup:
+    """Foydalanuvchi uchun moderatsiya tugmalari."""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text=f"⚠️ Warn ({warn_count}/3)", callback_data=f"mod_warn_{user_id}"),
+            InlineKeyboardButton(text="🗑 Warn olib tash",         callback_data=f"mod_unwarn_{user_id}"),
+        ],
+        [
+            InlineKeyboardButton(text="🔇 Mute",   callback_data=f"mod_mute_{user_id}"),
+            InlineKeyboardButton(text="🔊 Unmute", callback_data=f"mod_unmute_{user_id}"),
+        ],
+        [
+            InlineKeyboardButton(text="🚫 Ban",    callback_data=f"mod_ban_{user_id}"),
+            InlineKeyboardButton(text="✅ Unban",  callback_data=f"mod_unban_{user_id}"),
+        ],
+        [
+            InlineKeyboardButton(text="👑 Admin qil",     callback_data=f"mod_admin_{user_id}"),
+            InlineKeyboardButton(text="❌ Admin olib tash", callback_data=f"mod_unadmin_{user_id}"),
+        ],
+    ])
+
+async def get_target_user(message: types.Message):
+    """Reply qilingan xabardan yoki komanda argumentidan user_id va first_name oladi."""
+    if message.reply_to_message:
+        u = message.reply_to_message.from_user
+        return u.id, u.first_name or "Foydalanuvchi"
+    # /komanda ID yoki @username formatida
+    parts = message.text.split()
+    if len(parts) > 1:
+        arg = parts[1]
+        if arg.isdigit():
+            return int(arg), f"ID:{arg}"
+        if arg.startswith("@"):
+            try:
+                chat = await bot.get_chat(arg)
+                return chat.id, chat.first_name or arg
+            except Exception:
+                pass
+    return None, None
+
+# ─────────────────────────────────────────────────────────────────────
+# /warns — Barcha warn'larni ko'rsatish
+# ─────────────────────────────────────────────────────────────────────
+@sync_to_async
+def get_all_warnings() -> list:
+    return list(UserWarning.objects.filter(count__gt=0).order_by('-count').values('user_id', 'count'))
+
+@dp.message(F.text.startswith("/warns"), F.chat.id == MAIN_CHAT_ID)
+async def cmd_warns_list(message: types.Message):
+    if not await is_admin(MAIN_CHAT_ID, message.from_user.id):
+        return await message.reply("❌ Faqat adminlar uchun!")
+
+    warnings = await get_all_warnings()
+    if not warnings:
+        return await message.reply("✅ Hozircha hech kim ogohlantirish olmagan.")
+
+    lines = ["📋 <b>Ogohlantirish jadvali:</b>\n"]
+    for i, w in enumerate(warnings, 1):
+        lines.append(f"{i}. ID <code>{w['user_id']}</code> — <b>{w['count']}/3</b> ogohlantirish")
+    await message.reply("\n".join(lines), parse_mode="HTML")
+
+# ─────────────────────────────────────────────────────────────────────
+# /warn — Foydalanuvchini ogohlantirish
+# ─────────────────────────────────────────────────────────────────────
+@dp.message(F.text.startswith("/warn"), F.chat.id == MAIN_CHAT_ID)
+async def cmd_warn(message: types.Message):
+    if not await is_admin(MAIN_CHAT_ID, message.from_user.id):
+        return await message.reply("❌ Faqat adminlar uchun!")
+
+    user_id, first_name = await get_target_user(message)
+    if not user_id:
+        return await message.reply("❗ Reply qiling yoki /warn @username / ID yozing.")
+
+    if await is_admin(MAIN_CHAT_ID, user_id):
+        return await message.reply("⚠️ Admin ogohlantirish olmaydi!")
+
+    count = await get_warning(user_id) + 1
+    await set_warning(user_id, count)
+
+    if count >= 3:
+        try:
+            await bot.ban_chat_member(chat_id=MAIN_CHAT_ID, user_id=user_id)
+            await set_warning(user_id, 0)
+            await message.reply(
+                f"🚫 <b>{first_name}</b> 3/3 ogohlantirish to'ldirib banlandi!",
+                parse_mode="HTML",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
+                    InlineKeyboardButton(text="✅ Unban", callback_data=f"mod_unban_{user_id}")
+                ]])
+            )
+            await send_log(f"🚫 <b>Ban (warn to'ldi):</b>\n👤 {first_name} — <code>{user_id}</code>", user_id=user_id, unblock_button=True)
+        except Exception as e:
+            await message.reply(f"❌ Ban qilishda xatolik: {e}")
+    else:
+        await message.reply(
+            f"⚠️ <b>{first_name}</b> ogohlantirish oldi: <b>{count}/3</b>",
+            parse_mode="HTML",
+            reply_markup=mod_buttons(user_id, count)
+        )
+        await send_log(f"⚠️ <b>Warn:</b>\n👤 {first_name} — <code>{user_id}</code>\n📊 {count}/3")
+
+# ─────────────────────────────────────────────────────────────────────
+# /unwarn — Ogohlantirish olib tashlash
+# ─────────────────────────────────────────────────────────────────────
+@dp.message(F.text.startswith("/unwarn"), F.chat.id == MAIN_CHAT_ID)
+async def cmd_unwarn(message: types.Message):
+    if not await is_admin(MAIN_CHAT_ID, message.from_user.id):
+        return await message.reply("❌ Faqat adminlar uchun!")
+
+    user_id, first_name = await get_target_user(message)
+    if not user_id:
+        return await message.reply("❗ Reply qiling yoki /unwarn @username / ID yozing.")
+
+    count = await get_warning(user_id)
+    if count <= 0:
+        return await message.reply(f"ℹ️ <b>{first_name}</b> ning ogohlantirishi yo'q.", parse_mode="HTML")
+
+    new_count = count - 1
+    await set_warning(user_id, new_count)
+    await message.reply(
+        f"✅ <b>{first_name}</b> dan 1 ogohlantirish olib tashlandi. Qoldi: <b>{new_count}/3</b>",
+        parse_mode="HTML",
+        reply_markup=mod_buttons(user_id, new_count)
+    )
+    await send_log(f"✅ <b>Unwarn:</b>\n👤 {first_name} — <code>{user_id}</code>\n📊 {new_count}/3")
+
+# ─────────────────────────────────────────────────────────────────────
+# /ban — Ban
+# ─────────────────────────────────────────────────────────────────────
+@dp.message(F.text.startswith("/ban"), F.chat.id == MAIN_CHAT_ID)
+async def cmd_ban(message: types.Message):
+    if not await is_admin(MAIN_CHAT_ID, message.from_user.id):
+        return await message.reply("❌ Faqat adminlar uchun!")
+
+    user_id, first_name = await get_target_user(message)
+    if not user_id:
+        return await message.reply("❗ Reply qiling yoki /ban @username / ID yozing.")
+
+    if await is_admin(MAIN_CHAT_ID, user_id):
+        return await message.reply("⛔ Adminni ban qilib bo'lmaydi!")
+
+    parts = message.text.split(maxsplit=2)
+    reason = parts[2] if len(parts) > 2 else (parts[1] if not parts[1].startswith("@") and not parts[1].isdigit() else "Ko'rsatilmagan")
+    if message.reply_to_message and len(parts) > 1:
+        reason = " ".join(parts[1:])
+
+    try:
+        await bot.ban_chat_member(chat_id=MAIN_CHAT_ID, user_id=user_id)
+        await set_warning(user_id, 0)
+        await message.reply(
+            f"🚫 <b>{first_name}</b> banlandi!\n📝 Sabab: {reason}",
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
+                InlineKeyboardButton(text="✅ Unban", callback_data=f"mod_unban_{user_id}")
+            ]])
+        )
+        await send_log(f"🚫 <b>Ban:</b>\n👤 {first_name} — <code>{user_id}</code>\n📝 {reason}", user_id=user_id, unblock_button=True)
+    except Exception as e:
+        await message.reply(f"❌ Ban xatolik: {e}")
+
+# ─────────────────────────────────────────────────────────────────────
+# /unban — Unban
+# ─────────────────────────────────────────────────────────────────────
+@dp.message(F.text.startswith("/unban"), F.chat.id == MAIN_CHAT_ID)
+async def cmd_unban(message: types.Message):
+    if not await is_admin(MAIN_CHAT_ID, message.from_user.id):
+        return await message.reply("❌ Faqat adminlar uchun!")
+
+    user_id, first_name = await get_target_user(message)
+    if not user_id:
+        return await message.reply("❗ Reply qiling yoki /unban @username / ID yozing.")
+
+    try:
+        await bot.unban_chat_member(chat_id=MAIN_CHAT_ID, user_id=user_id, only_if_banned=True)
+        await message.reply(f"✅ <b>{first_name}</b> ban olib tashlandi!", parse_mode="HTML")
+        await send_log(f"✅ <b>Unban:</b>\n👤 {first_name} — <code>{user_id}</code>")
+    except Exception as e:
+        await message.reply(f"❌ Unban xatolik: {e}")
+
+# ─────────────────────────────────────────────────────────────────────
+# /mute — Mute (xabar yoza olmaydi)
+# ─────────────────────────────────────────────────────────────────────
+@dp.message(F.text.startswith("/mute"), F.chat.id == MAIN_CHAT_ID)
+async def cmd_mute(message: types.Message):
+    if not await is_admin(MAIN_CHAT_ID, message.from_user.id):
+        return await message.reply("❌ Faqat adminlar uchun!")
+
+    user_id, first_name = await get_target_user(message)
+    if not user_id:
+        return await message.reply("❗ Reply qiling yoki /mute @username / ID yozing.")
+
+    if await is_admin(MAIN_CHAT_ID, user_id):
+        return await message.reply("⛔ Adminni mute qilib bo'lmaydi!")
+
+    from aiogram.types import ChatPermissions
+    try:
+        await bot.restrict_chat_member(
+            chat_id=MAIN_CHAT_ID,
+            user_id=user_id,
+            permissions=ChatPermissions(can_send_messages=False)
+        )
+        await message.reply(
+            f"🔇 <b>{first_name}</b> mute qilindi!",
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
+                InlineKeyboardButton(text="🔊 Unmute", callback_data=f"mod_unmute_{user_id}")
+            ]])
+        )
+        await send_log(f"🔇 <b>Mute:</b>\n👤 {first_name} — <code>{user_id}</code>")
+    except Exception as e:
+        await message.reply(f"❌ Mute xatolik: {e}")
+
+# ─────────────────────────────────────────────────────────────────────
+# /unmute — Unmute
+# ─────────────────────────────────────────────────────────────────────
+@dp.message(F.text.startswith("/unmute"), F.chat.id == MAIN_CHAT_ID)
+async def cmd_unmute(message: types.Message):
+    if not await is_admin(MAIN_CHAT_ID, message.from_user.id):
+        return await message.reply("❌ Faqat adminlar uchun!")
+
+    user_id, first_name = await get_target_user(message)
+    if not user_id:
+        return await message.reply("❗ Reply qiling yoki /unmute @username / ID yozing.")
+
+    from aiogram.types import ChatPermissions
+    try:
+        await bot.restrict_chat_member(
+            chat_id=MAIN_CHAT_ID,
+            user_id=user_id,
+            permissions=ChatPermissions(
+                can_send_messages=True,
+                can_send_media_messages=True,
+                can_send_other_messages=True,
+                can_add_web_page_previews=True,
+            )
+        )
+        await message.reply(f"🔊 <b>{first_name}</b> unmute qilindi!", parse_mode="HTML")
+        await send_log(f"🔊 <b>Unmute:</b>\n👤 {first_name} — <code>{user_id}</code>")
+    except Exception as e:
+        await message.reply(f"❌ Unmute xatolik: {e}")
+
+# ─────────────────────────────────────────────────────────────────────
+# /admin — Admin qilish
+# ─────────────────────────────────────────────────────────────────────
+@dp.message(F.text.startswith("/admin"), F.chat.id == MAIN_CHAT_ID)
+async def cmd_make_admin(message: types.Message):
+    if not await is_admin(MAIN_CHAT_ID, message.from_user.id):
+        return await message.reply("❌ Faqat adminlar uchun!")
+
+    user_id, first_name = await get_target_user(message)
+    if not user_id:
+        return await message.reply("❗ Reply qiling yoki /admin @username / ID yozing.")
+
+    try:
+        await bot.promote_chat_member(
+            chat_id=MAIN_CHAT_ID,
+            user_id=user_id,
+            can_delete_messages=True,
+            can_restrict_members=True,
+            can_pin_messages=True,
+            can_invite_users=True,
+        )
+        await message.reply(f"👑 <b>{first_name}</b> admin qilindi!", parse_mode="HTML")
+        await send_log(f"👑 <b>Admin qilindi:</b>\n👤 {first_name} — <code>{user_id}</code>")
+    except Exception as e:
+        await message.reply(f"❌ Admin qilishda xatolik: {e}")
+
+# ─────────────────────────────────────────────────────────────────────
+# /unadmin — Admin olib tashlash
+# ─────────────────────────────────────────────────────────────────────
+@dp.message(F.text.startswith("/unadmin"), F.chat.id == MAIN_CHAT_ID)
+async def cmd_unadmin(message: types.Message):
+    if not await is_admin(MAIN_CHAT_ID, message.from_user.id):
+        return await message.reply("❌ Faqat adminlar uchun!")
+
+    user_id, first_name = await get_target_user(message)
+    if not user_id:
+        return await message.reply("❗ Reply qiling yoki /unadmin @username / ID yozing.")
+
+    try:
+        await bot.promote_chat_member(
+            chat_id=MAIN_CHAT_ID,
+            user_id=user_id,
+            can_delete_messages=False,
+            can_restrict_members=False,
+            can_pin_messages=False,
+            can_invite_users=False,
+            can_manage_chat=False,
+        )
+        await message.reply(f"❌ <b>{first_name}</b> admin huquqi olib tashlandi!", parse_mode="HTML")
+        await send_log(f"❌ <b>Unadmin:</b>\n👤 {first_name} — <code>{user_id}</code>")
+    except Exception as e:
+        await message.reply(f"❌ Unadmin xatolik: {e}")
+
+# ─────────────────────────────────────────────────────────────────────
+# INLINE BUTTON CALLBACK'LAR — mod_* tugmalari
+# ─────────────────────────────────────────────────────────────────────
+@dp.callback_query(F.data.startswith("mod_"))
+async def mod_callback_handler(callback: CallbackQuery):
+    """Barcha moderatsiya tugmalarini bitta handler boshqaradi."""
+    if not await is_admin(MAIN_CHAT_ID, callback.from_user.id):
+        return await callback.answer("❌ Faqat adminlar!", show_alert=True)
+
+    parts = callback.data.split("_")   # ['mod', 'action', 'user_id']
+    action  = parts[1]
+    user_id = int(parts[2])
+
+    try:
+        member = await bot.get_chat_member(MAIN_CHAT_ID, user_id)
+        first_name = member.user.first_name or f"ID:{user_id}"
+    except Exception:
+        first_name = f"ID:{user_id}"
+
+    from aiogram.types import ChatPermissions
+
+    if action == "warn":
+        if await is_admin(MAIN_CHAT_ID, user_id):
+            return await callback.answer("⛔ Adminni warn qilib bo'lmaydi!", show_alert=True)
+        count = await get_warning(user_id) + 1
+        await set_warning(user_id, count)
+        if count >= 3:
+            await bot.ban_chat_member(chat_id=MAIN_CHAT_ID, user_id=user_id)
+            await set_warning(user_id, 0)
+            await callback.message.edit_text(
+                f"🚫 <b>{first_name}</b> 3/3 warn — banlandi!",
+                parse_mode="HTML",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
+                    InlineKeyboardButton(text="✅ Unban", callback_data=f"mod_unban_{user_id}")
+                ]])
+            )
+            await send_log(f"🚫 <b>Ban (warn to'ldi):</b>\n👤 {first_name} — <code>{user_id}</code>", user_id=user_id, unblock_button=True)
+        else:
+            await callback.message.edit_reply_markup(reply_markup=mod_buttons(user_id, count))
+            await send_log(f"⚠️ <b>Warn (tugma):</b>\n👤 {first_name} — <code>{user_id}</code>\n📊 {count}/3")
+        await callback.answer(f"⚠️ Warn berildi: {count}/3")
+
+    elif action == "unwarn":
+        count = await get_warning(user_id)
+        if count <= 0:
+            return await callback.answer("ℹ️ Ogohlantirish yo'q.", show_alert=True)
+        new_count = count - 1
+        await set_warning(user_id, new_count)
+        await callback.message.edit_reply_markup(reply_markup=mod_buttons(user_id, new_count))
+        await send_log(f"✅ <b>Unwarn (tugma):</b>\n👤 {first_name} — <code>{user_id}</code>\n📊 {new_count}/3")
+        await callback.answer(f"✅ Warn olib tashlandi. Qoldi: {new_count}/3")
+
+    elif action == "mute":
+        if await is_admin(MAIN_CHAT_ID, user_id):
+            return await callback.answer("⛔ Adminni mute qilib bo'lmaydi!", show_alert=True)
+        await bot.restrict_chat_member(
+            chat_id=MAIN_CHAT_ID, user_id=user_id,
+            permissions=ChatPermissions(can_send_messages=False)
+        )
+        await callback.answer(f"🔇 {first_name} mute qilindi!")
+        await send_log(f"🔇 <b>Mute (tugma):</b>\n👤 {first_name} — <code>{user_id}</code>")
+
+    elif action == "unmute":
+        await bot.restrict_chat_member(
+            chat_id=MAIN_CHAT_ID, user_id=user_id,
+            permissions=ChatPermissions(
+                can_send_messages=True,
+                can_send_media_messages=True,
+                can_send_other_messages=True,
+                can_add_web_page_previews=True,
+            )
+        )
+        await callback.answer(f"🔊 {first_name} unmute qilindi!")
+        await send_log(f"🔊 <b>Unmute (tugma):</b>\n👤 {first_name} — <code>{user_id}</code>")
+
+    elif action == "ban":
+        if await is_admin(MAIN_CHAT_ID, user_id):
+            return await callback.answer("⛔ Adminni ban qilib bo'lmaydi!", show_alert=True)
+        await bot.ban_chat_member(chat_id=MAIN_CHAT_ID, user_id=user_id)
+        await set_warning(user_id, 0)
+        await callback.message.edit_reply_markup(reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="✅ Unban", callback_data=f"mod_unban_{user_id}")
+        ]]))
+        await callback.answer(f"🚫 {first_name} banlandi!")
+        await send_log(f"🚫 <b>Ban (tugma):</b>\n👤 {first_name} — <code>{user_id}</code>", user_id=user_id, unblock_button=True)
+
+    elif action == "unban":
+        await bot.unban_chat_member(chat_id=MAIN_CHAT_ID, user_id=user_id, only_if_banned=True)
+        await callback.message.edit_reply_markup(reply_markup=mod_buttons(user_id, 0))
+        await callback.answer(f"✅ {first_name} unban qilindi!")
+        await send_log(f"✅ <b>Unban (tugma):</b>\n👤 {first_name} — <code>{user_id}</code>")
+
+    elif action == "admin":
+        await bot.promote_chat_member(
+            chat_id=MAIN_CHAT_ID, user_id=user_id,
+            can_delete_messages=True,
+            can_restrict_members=True,
+            can_pin_messages=True,
+            can_invite_users=True,
+        )
+        await callback.answer(f"👑 {first_name} admin qilindi!")
+        await send_log(f"👑 <b>Admin (tugma):</b>\n👤 {first_name} — <code>{user_id}</code>")
+
+    elif action == "unadmin":
+        await bot.promote_chat_member(
+            chat_id=MAIN_CHAT_ID, user_id=user_id,
+            can_delete_messages=False,
+            can_restrict_members=False,
+            can_pin_messages=False,
+            can_invite_users=False,
+            can_manage_chat=False,
+        )
+        await callback.answer(f"❌ {first_name} admin emas!")
+        await send_log(f"❌ <b>Unadmin (tugma):</b>\n👤 {first_name} — <code>{user_id}</code>")
+
+    else:
+        await callback.answer("❓ Noma'lum amal.", show_alert=True)
+
+# ─────────────────────────────────────────────────────────────────────
+
 @dp.message(F.text == "/start")
 async def cmd_start(message: types.Message):
     await save_user_to_db(message.from_user.id, message.from_user.username, message.from_user.first_name)
