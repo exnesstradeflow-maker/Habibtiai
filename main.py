@@ -1236,7 +1236,11 @@ async def cmd_unban(message: types.Message):
             )
 
         # only_if_banned=False — chunki "left" statusli ban ham bo'lishi mumkin
-        await bot.unban_chat_member(chat_id=MAIN_CHAT_ID, user_id=user_id, only_if_banned=False)
+        try:
+            await bot.unban_chat_member(chat_id=MAIN_CHAT_ID, user_id=user_id, only_if_banned=False)
+        except Exception as ue:
+            if "PARTICIPANT_ID_INVALID" not in str(ue):
+                raise
         await message.reply(f"✅ <b>{first_name}</b> ban olib tashlandi!", parse_mode="HTML")
         await send_log(
             f"✅ <b>Unban:</b>\n👤 {first_name} — <code>{user_id}</code>",
@@ -1485,7 +1489,8 @@ async def mod_callback_handler(callback: CallbackQuery):
         try:
             await bot.unban_chat_member(chat_id=MAIN_CHAT_ID, user_id=user_id, only_if_banned=False)
         except Exception as unban_err:
-            logger.warning(f"Unban (tugma) muammo: {unban_err}")
+            if "PARTICIPANT_ID_INVALID" not in str(unban_err):
+                logger.warning(f"Unban (tugma) muammo: {unban_err}")
         try:
             await callback.message.edit_reply_markup(reply_markup=mod_buttons(user_id, 0))
         except Exception:
@@ -1648,7 +1653,11 @@ async def unblock_user(callback: CallbackQuery):
     user_id = int(callback.data.split("_")[1])
     try:
         # only_if_banned=False — guruhda bo'lmagan / left bo'lgan userlarni ham unban qiladi
-        await bot.unban_chat_member(chat_id=MAIN_CHAT_ID, user_id=user_id, only_if_banned=False)
+        try:
+            await bot.unban_chat_member(chat_id=MAIN_CHAT_ID, user_id=user_id, only_if_banned=False)
+        except Exception as ue:
+            if "PARTICIPANT_ID_INVALID" not in str(ue):
+                raise
         link = await get_invite_link(user_id)
         if not link:
             invite = await bot.create_chat_invite_link(chat_id=MAIN_CHAT_ID, member_limit=1)
