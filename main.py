@@ -1755,7 +1755,7 @@ async def on_join_request(update: types.ChatJoinRequest):
                 await send_private(
                     update.from_user.id,
                     "❌ Guruhga kirish hozircha yopiq.\n"
-                    "Admin bilan bog'laning: @admin"
+                    "Admin bilan bog'laning: @samir_axii"
                 )
             except Exception as e:
                 logger.error(f"Ariza rad etishda xatolik: {e}")
