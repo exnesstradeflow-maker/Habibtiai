@@ -627,19 +627,36 @@ def fix_missing_tables():
                 if table_name not in existing_tables:
                     try:
                         schema_editor.create_model(model)
-                        logger.info(f"✅ Jadval yaratildi: {table_name}")
+                        logger.info(f"Jadval yaratildi: {table_name}")
                     except Exception as e:
                         logger.error(f"Jadval yaratishda xatolik ({model.__name__}): {e}")
                 else:
-                    logger.info(f"ℹ️ Jadval mavjud: {table_name}")
+                    # Jadval mavjud -- lekin yangi ustunlar bo'lishi mumkin, tekshir
+                    try:
+                        existing_columns = {
+                            col.name
+                            for col in connection.introspection.get_table_description(
+                                connection.cursor(), table_name
+                            )
+                        }
+                        for field in model._meta.local_fields:
+                            col_name = field.column
+                            if col_name not in existing_columns:
+                                schema_editor.add_field(model, field)
+                                logger.info(f"Yangi ustun qo'shildi: {table_name}.{col_name}")
+                    except Exception as e:
+                        logger.error(f"Ustun qo'shishda xatolik ({model.__name__}): {e}")
     except Exception as e:
         logger.error(f"Schema editor xatolik: {e}")
 
     # 3. Defolt bot sozlamasini yaratish
     try:
         if not BotSetting.objects.exists():
-            BotSetting.objects.create(is_captcha_active=True)
-            logger.info("⚙ Standart bot sozlamalari yaratildi.")
+            BotSetting.objects.create(is_captcha_active=True, is_link_active=True)
+            logger.info("Standart bot sozlamalari yaratildi.")
+        else:
+            # Mavjud yozuvda is_link_active None bo'lishi mumkin -- True ga o'rnat
+            BotSetting.objects.filter(is_link_active__isnull=True).update(is_link_active=True)
     except Exception as e:
         logger.error(f"BotSetting yaratishda xatolik: {e}")
 
