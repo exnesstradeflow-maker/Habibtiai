@@ -206,8 +206,9 @@ if not settings.configured:
 # 4. MODELLAR
 # =====================================================================
 class BotSetting(models.Model):
-    is_captcha_active = models.BooleanField("Kaptcha faolmi? / Активна ли каптча?", default=True)
-    is_link_active    = models.BooleanField("Havola olish faolmi? / Активна ли кнопка ссылки?", default=True)
+    is_captcha_active      = models.BooleanField("Kaptcha faolmi? / Активна ли каптча?", default=True)
+    is_link_active         = models.BooleanField("Havola olish faolmi? / Активна ли кнопка ссылки?", default=True)
+    is_join_request_active = models.BooleanField("Arizalarni qabul qilsinmi? / Принимать заявки?", default=True)
 
     class Meta:
         app_label = '__main__'
@@ -435,15 +436,16 @@ class GroupMessage(models.Model):
 if not admin.site.is_registered(BotSetting):
     @admin.register(BotSetting)
     class BotSettingAdmin(admin.ModelAdmin):
-        list_display  = ('__str__', 'is_captcha_active', 'is_link_active')
+        list_display  = ('__str__', 'is_captcha_active', 'is_link_active', 'is_join_request_active')
         fieldsets = (
             ("⚙️ Bot Sozlamalari", {
-                'fields': ('is_captcha_active', 'is_link_active'),
+                'fields': ('is_captcha_active', 'is_link_active', 'is_join_request_active'),
                 'description': (
                     '<p style="color:#ffd700; font-size:13px;">'
                     '⚙️ Bu yerda botning asosiy funksiyalarini yoqib/o\'chirishingiz mumkin.<br>'
                     '🔐 <b>Kaptcha</b> — Guruhga kirmoqchi bo\'lganlar uchun rasm-kod tekshiruvi.<br>'
-                    '🔗 <b>Havola olish</b> — Foydalanuvchilar bot orqali guruhga link ola olishi.'
+                    '🔗 <b>Havola olish</b> — Foydalanuvchilar bot orqali guruhga link ola olishi.<br>'
+                    '🚪 <b>Arizalarni qabul qilish</b> — Guruhga qo\'shilish arizalarini avtomatik qabul/rad qilish.'
                     '</p>'
                 )
             }),
@@ -663,7 +665,7 @@ def fix_missing_tables():
     # 3. Defolt bot sozlamasini yaratish
     try:
         if not BotSetting.objects.exists():
-            BotSetting.objects.create(is_captcha_active=True, is_link_active=True)
+            BotSetting.objects.create(is_captcha_active=True, is_link_active=True, is_join_request_active=True)
             logger.info("Standart bot sozlamalari yaratildi.")
         else:
             # Mavjud yozuvda is_link_active None bo'lishi mumkin -- True ga o'rnat
@@ -733,6 +735,14 @@ def is_link_enabled_in_db() -> bool:
         return True
 
 @sync_to_async
+def is_join_request_enabled_in_db() -> bool:
+    try:
+        setting = BotSetting.objects.first()
+        return setting.is_join_request_active if setting else True
+    except Exception:
+        return True
+
+@sync_to_async
 def is_bot_admin(user_id: int) -> bool:
     try:
         return BotAdmin.objects.filter(user_id=user_id).exists()
@@ -746,8 +756,9 @@ def get_bot_settings_status():
         if not setting:
             return {"captcha": True, "link": True}
         return {
-            "captcha": setting.is_captcha_active,
-            "link":    setting.is_link_active,
+            "captcha":       setting.is_captcha_active,
+            "link":          setting.is_link_active,
+            "join_request":  setting.is_join_request_active,
         }
     except Exception:
         return {"captcha": True, "link": True}
@@ -1556,6 +1567,7 @@ async def cmd_status(message: types.Message):
         "━━━━━━━━━━━━━━━━━━━━\n"
         f"🤖 <b>Kaptcha tekshiruvi:</b>  {icon(status['captcha'])}\n"
         f"🔗 <b>Havola olish (link):</b> {icon(status['link'])}\n"
+        f"🚪 <b>Ariza qabul qilish:</b>   {icon(status['join_request'])}\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
         "🛠 Sozlamalarni o'zgartirish uchun:\n"
         "<b>Admin panel → ⚙ Bot Sozlamalari</b>"
@@ -1735,6 +1747,20 @@ async def on_join_request(update: types.ChatJoinRequest):
                 logger.error(f"Hafli user join rad etishda xatolik: {e}")
             return
 
+        # Ariza qabul qilish yoqiq/o'chiqligini tekshiramiz
+        join_active = await is_join_request_enabled_in_db()
+        if not join_active:
+            try:
+                await bot.decline_chat_join_request(MAIN_CHAT_ID, update.from_user.id)
+                await send_private(
+                    update.from_user.id,
+                    "❌ Guruhga kirish hozircha yopiq.\n"
+                    "Admin bilan bog'laning: @admin"
+                )
+            except Exception as e:
+                logger.error(f"Ariza rad etishda xatolik: {e}")
+            return
+
         # DB dagi BotSetting holatini tekshiramiz
         captcha_active = await is_captcha_enabled_in_db()
         if captcha_active:
@@ -1742,7 +1768,7 @@ async def on_join_request(update: types.ChatJoinRequest):
         else:
             try:
                 await bot.approve_chat_join_request(MAIN_CHAT_ID, update.from_user.id)
-                await send_private(update.from_user.id, "✅ Guruhga xush kelibsiz! (Kaptcha tekshiruvi o'chirilgan) 🎉")
+                await send_private(update.from_user.id, "✅ Guruhga xush kelibsiz! 🎉")
             except Exception as e:
                 logger.error(f"To'g'ridan-to'g'ri qabul qilishda xatolik: {e}")
 
