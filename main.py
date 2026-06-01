@@ -124,7 +124,7 @@ if not settings.configured:
             "site_brand":    "⚜ Mafia Habibiti",
             "welcome_sign":  "Boshqaruv Paneliga Xush Kelibsiz!",
             "copyright":     "Mafia Habibiti Inc",
-            "search_model": ["auth.User", "__main__.BadWord"],
+            "search_model": ["auth.User", "__main__.BadWord", "__main__.BotAdmin"],
             "show_sidebar":          True,
             "navigation_expanded":   True,
             "hide_apps":             [],
@@ -133,6 +133,7 @@ if not settings.configured:
                 "auth":                      "fas fa-users-cog",
                 "auth.user":                 "fas fa-user-shield",
                 "auth.Group":                "fas fa-users",
+                "__main__.BotAdmin":         "fas fa-user-cog",
                 "__main__.TelegramUser":     "fas fa-users",
                 "__main__.BroadcastMessage": "fas fa-paper-plane",
                 "__main__.BadWord":          "fas fa-ban",
@@ -146,6 +147,7 @@ if not settings.configured:
             "default_icon_children": "fas fa-circle",
             "order_with_respect_to": [
                 "__main__.BotSetting",
+                "__main__.BotAdmin",
                 "__main__.GroupMessage",
                 "__main__.GroupRule",
                 "__main__.TelegramUser",
@@ -194,6 +196,7 @@ if not settings.configured:
 # =====================================================================
 class BotSetting(models.Model):
     is_captcha_active = models.BooleanField("Kaptcha faolmi? / Активна ли каптча?", default=True)
+    is_link_active    = models.BooleanField("Havola olish faolmi? / Активна ли кнопка ссылки?", default=True)
 
     class Meta:
         app_label = '__main__'
@@ -202,6 +205,22 @@ class BotSetting(models.Model):
 
     def __str__(self):
         return "Tizim Sozlamalari"
+
+
+class BotAdmin(models.Model):
+    """Bot adminlari — faqat admin panel orqali qo'shiladi."""
+    user_id    = models.BigIntegerField("Telegram ID", unique=True)
+    username   = models.CharField("Username (ixtiyoriy)", max_length=150, null=True, blank=True)
+    first_name = models.CharField("Ismi", max_length=150, null=True, blank=True)
+    added_at   = models.DateTimeField("Qo'shilgan vaqti", auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.first_name or 'Admin'} ({self.user_id})"
+
+    class Meta:
+        app_label = '__main__'
+        verbose_name = "Bot Admini"
+        verbose_name_plural = "🤖 Bot Adminlari"
 
 
 class TelegramUser(models.Model):
@@ -405,8 +424,39 @@ class GroupMessage(models.Model):
 if not admin.site.is_registered(BotSetting):
     @admin.register(BotSetting)
     class BotSettingAdmin(admin.ModelAdmin):
-        list_display = ('__str__', 'is_captcha_active')
-        editable_fields = ('is_captcha_active',)
+        list_display  = ('__str__', 'is_captcha_active', 'is_link_active')
+        fieldsets = (
+            ("⚙️ Bot Sozlamalari", {
+                'fields': ('is_captcha_active', 'is_link_active'),
+                'description': (
+                    '<p style="color:#ffd700; font-size:13px;">'
+                    '⚙️ Bu yerda botning asosiy funksiyalarini yoqib/o\'chirishingiz mumkin.<br>'
+                    '🔐 <b>Kaptcha</b> — Guruhga kirmoqchi bo\'lganlar uchun rasm-kod tekshiruvi.<br>'
+                    '🔗 <b>Havola olish</b> — Foydalanuvchilar bot orqali guruhga link ola olishi.'
+                    '</p>'
+                )
+            }),
+        )
+
+if not admin.site.is_registered(BotAdmin):
+    @admin.register(BotAdmin)
+    class BotAdminAdmin(admin.ModelAdmin):
+        list_display  = ('user_id', 'username', 'first_name', 'added_at')
+        search_fields = ('user_id', 'username', 'first_name')
+        ordering      = ('-added_at',)
+        readonly_fields = ('added_at',)
+        fieldsets = (
+            ("🤖 Bot Admini Ma'lumotlari", {
+                'fields': ('user_id', 'username', 'first_name'),
+                'description': (
+                    '<p style="color:#ffd700; font-size:13px;">'
+                    '🤖 Bot adminlari — /status komandasi va bot funksiyalarini boshqara oladigan odamlar.<br>'
+                    '⚠️ Faqat shu yerdan qo\'shilgan Telegram ID egalari bot admini hisoblanadi.'
+                    '</p>'
+                )
+            }),
+            ('Qo\'shilgan vaqti', {'fields': ('added_at',), 'classes': ('collapse',)}),
+        )
 
 if not admin.site.is_registered(TelegramUser):
     @admin.register(TelegramUser)
@@ -645,6 +695,34 @@ def is_captcha_enabled_in_db() -> bool:
         return setting.is_captcha_active if setting else True
     except Exception:
         return True
+
+@sync_to_async
+def is_link_enabled_in_db() -> bool:
+    try:
+        setting = BotSetting.objects.first()
+        return setting.is_link_active if setting else True
+    except Exception:
+        return True
+
+@sync_to_async
+def is_bot_admin(user_id: int) -> bool:
+    try:
+        return BotAdmin.objects.filter(user_id=user_id).exists()
+    except Exception:
+        return False
+
+@sync_to_async
+def get_bot_settings_status():
+    try:
+        setting = BotSetting.objects.first()
+        if not setting:
+            return {"captcha": True, "link": True}
+        return {
+            "captcha": setting.is_captcha_active,
+            "link":    setting.is_link_active,
+        }
+    except Exception:
+        return {"captcha": True, "link": True}
 
 @sync_to_async
 def save_user_to_db(user_id: int, username: str, first_name: str):
@@ -1349,6 +1427,34 @@ async def mod_callback_handler(callback: CallbackQuery):
 
 # ─────────────────────────────────────────────────────────────────────
 
+@dp.message(F.text == "/status")
+async def cmd_status(message: types.Message):
+    """Bot funksiyalari holati — faqat bot adminlari ko'ra oladi."""
+    user_id = message.from_user.id
+
+    # Faqat bot admini yoki guruh creator/admin ko'ra oladi
+    is_gadmin = await is_bot_admin(user_id)
+    is_grpadmin = await is_admin(MAIN_CHAT_ID, user_id)
+
+    if not (is_gadmin or is_grpadmin):
+        return  # Jim o'tkazib yubor
+
+    status = await get_bot_settings_status()
+
+    def icon(val): return "✅ Yoqiq" if val else "❌ O'chiq"
+
+    text = (
+        "⚙️ <b>Bot Funksiyalari Holati</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        f"🤖 <b>Kaptcha tekshiruvi:</b>  {icon(status['captcha'])}\n"
+        f"🔗 <b>Havola olish (link):</b> {icon(status['link'])}\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "🛠 Sozlamalarni o'zgartirish uchun:\n"
+        "<b>Admin panel → ⚙ Bot Sozlamalari</b>"
+    )
+    await message.answer(text, parse_mode="HTML")
+
+
 @dp.message(F.text == "/start")
 async def cmd_start(message: types.Message):
     await save_user_to_db(message.from_user.id, message.from_user.username, message.from_user.first_name)
@@ -1399,6 +1505,17 @@ async def handle_support_reply(message: types.Message):
 @dp.callback_query(F.data == "get_link")
 async def get_link_callback(callback: CallbackQuery):
     user_id = callback.from_user.id
+
+    # Link yoqiq yoki o'chiqligini tekshir
+    link_active = await is_link_enabled_in_db()
+    if not link_active:
+        await callback.answer(
+            "🚫 Havola olish hozircha o'chirilgan.\n"
+            "Admin bilan bog'laning va link oling.",
+            show_alert=True
+        )
+        return
+
     existing_data = await get_user_link(user_id)
     if existing_data:
         await callback.answer("⚠️ Havola berilgan!", show_alert=True)
@@ -1579,7 +1696,7 @@ async def main():
     try:
         await bot.send_message(
             MAIN_CHAT_ID,
-            "⚠️ <b>Diqqat !</b> Bot yangilandi va yangi funksiyalar ishga tushdi. Hamma narsa avvalgidek ishlaydi! ✅",
+            "⚠️ <b>Diqqat!</b> Bot yangilandi va qayta ishga tushdi. Hamma narsa avvalgidek ishlaydi! ✅",
             parse_mode="HTML"
         )
     except Exception as e:
