@@ -1374,8 +1374,9 @@ async def cmd_unmute(message: types.Message):
 # ─────────────────────────────────────────────────────────────────────
 @dp.message(F.text.startswith("/admin"), F.chat.id == MAIN_CHAT_ID)
 async def cmd_make_admin(message: types.Message):
-    if not await is_admin(MAIN_CHAT_ID, message.from_user.id):
-        return await message.reply("❌ Faqat adminlar uchun!")
+    # Admin qilish huquqi FAQAT BotAdmin jadvalidagi odamlarda bo'ladi
+    if not await is_bot_admin(message.from_user.id):
+        return await message.reply("❌ Sizda bunday huquq yo'q!")
 
     user_id, first_name = await get_target_user(message)
     if not user_id:
@@ -1404,8 +1405,9 @@ async def cmd_make_admin(message: types.Message):
 # ─────────────────────────────────────────────────────────────────────
 @dp.message(F.text.startswith("/unadmin"), F.chat.id == MAIN_CHAT_ID)
 async def cmd_unadmin(message: types.Message):
-    if not await is_admin(MAIN_CHAT_ID, message.from_user.id):
-        return await message.reply("❌ Faqat adminlar uchun!")
+    # Admin olib tashlash huquqi FAQAT BotAdmin jadvalidagi odamlarda bo'ladi
+    if not await is_bot_admin(message.from_user.id):
+        return await message.reply("❌ Sizda bunday huquq yo'q!")
 
     user_id, first_name = await get_target_user(message)
     if not user_id:
@@ -1552,6 +1554,9 @@ async def mod_callback_handler(callback: CallbackQuery):
         )
 
     elif action == "admin":
+        # Tugma orqali admin qilish — faqat bot_admin huquqi bo'lganlarga
+        if not await is_bot_admin(callback.from_user.id):
+            return await callback.answer("❌ Sizda bunday huquq yo'q!", show_alert=True)
         await bot.promote_chat_member(
             chat_id=MAIN_CHAT_ID, user_id=user_id,
             can_delete_messages=True,
@@ -1566,6 +1571,9 @@ async def mod_callback_handler(callback: CallbackQuery):
         )
 
     elif action == "unadmin":
+        # Tugma orqali admin olib tashlash — faqat bot_admin huquqi bo'lganlarga
+        if not await is_bot_admin(callback.from_user.id):
+            return await callback.answer("❌ Sizda bunday huquq yo'q!", show_alert=True)
         await bot.promote_chat_member(
             chat_id=MAIN_CHAT_ID, user_id=user_id,
             can_delete_messages=False,
@@ -1730,7 +1738,7 @@ async def get_link_callback(callback: CallbackQuery):
         return
     try:
         invite = await bot.create_chat_invite_link(chat_id=MAIN_CHAT_ID, member_limit=1)
-        log_msg = await bot.send_message(LOG_CHAT_ID, f"🔗 <b>Havola olindi</b>\n👤 {callback.from_user.first_name}\n🌐 {invite.invite_link}", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="❌ Bekor qilish", callback_data=f"cancel_link_{user_id}")]], parse_mode="HTML"))
+        log_msg = await bot.send_message(LOG_CHAT_ID, f"🔗 <b>Havola olindi</b>\n👤 {callback.from_user.first_name}\n🌐 {invite.invite_link}", parse_mode="HTML", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="❌ Bekor qilish", callback_data=f"cancel_link_{user_id}")]]))
         await set_user_link(user_id, invite.invite_link, log_msg.message_id)
         await callback.message.answer(f"🔗 Havolangiz:\n\n{invite.invite_link}")
         await callback.answer()
