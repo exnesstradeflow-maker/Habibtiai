@@ -180,24 +180,24 @@ if not settings.configured:
         },
 
         JAZZMIN_UI_TWEAKS={
-            "theme":           "darkly",
-            "navbar":          "navbar-dark bg-dark",
+            "theme":           "default",
+            "navbar":          "navbar-dark",
             "no_navbar_border": True,
             "navbar_fixed":    True,
-            "sidebar":         "sidebar-dark-warning",
-            "sidebar_nav_small_text":   False,
-            "sidebar_disable_expand":   False,
-            "sidebar_nav_child_indent": True,
-            "sidebar_nav_compact_style": False,
-            "sidebar_nav_flat_style":   False,
-            "sidebar_nav_legacy_style": False,
-            "accent": "accent-warning",
+            "sidebar":         "sidebar-dark-primary",
+            "sidebar_nav_small_text":    False,
+            "sidebar_disable_expand":    False,
+            "sidebar_nav_child_indent":  True,
+            "sidebar_nav_compact_style": True,
+            "sidebar_nav_flat_style":    False,
+            "sidebar_nav_legacy_style":  False,
+            "accent":       "accent-primary",
             "footer_fixed": False,
             "button_classes": {
-                "primary":   "btn-warning text-dark font-weight-bold",
-                "secondary": "btn-outline-secondary",
-                "info":      "btn-outline-info",
-                "warning":   "btn-warning text-dark",
+                "primary":   "btn-primary",
+                "secondary": "btn-secondary",
+                "info":      "btn-info",
+                "warning":   "btn-warning",
                 "danger":    "btn-danger",
                 "success":   "btn-success",
             },
@@ -2675,7 +2675,7 @@ async def on_join_request(update: types.ChatJoinRequest):
 
 @dp.chat_member()
 async def on_chat_member_update(update: types.ChatMemberUpdated):
-    """Yangi a'zo kirganida qoida yuboradi va hafli userni qayta ban qiladi."""
+    """A'zo holati o'zgarganda: yangi a'zo, ban, unban, hafli userni qayta ban."""
     if update.chat.id != MAIN_CHAT_ID:
         return
 
@@ -2683,9 +2683,15 @@ async def on_chat_member_update(update: types.ChatMemberUpdated):
     new_status = update.new_chat_member.status
     user       = update.new_chat_member.user
     user_id    = user.id
+    user_name  = user.first_name or f"ID:{user_id}"
+    username   = f"@{user.username}" if user.username else "—"
+
+    # Kim ban qilganini aniqlaymiz (agar Telegram bersa)
+    banned_by = None
+    if update.from_user and update.from_user.id != user_id:
+        banned_by = update.from_user.first_name or f"ID:{update.from_user.id}"
 
     # ── Yangi a'zo kirdi ──────────────────────────────────────────────
-    # "left" yoki "kicked" dan "member" ga o'tish = yangi qo'shildi
     just_joined = (
         old_status in ("left", "kicked") and
         new_status in ("member", "restricted")
@@ -2694,26 +2700,108 @@ async def on_chat_member_update(update: types.ChatMemberUpdated):
         rules_text = await get_active_rules()
         if rules_text:
             greeting = (
-                f"👋 Salom, <b>{user.first_name}</b>!\n\n"
+                f"👋 Salom, <b>{user_name}</b>!\n\n"
                 f"🎉 <b>Guruhga xush kelibsiz!</b>\n\n"
                 f"{rules_text}\n\n"
                 f"⚠️ Qoidalarga rioya qilmasangiz, ogohlantirish yoki ban beriladi."
             )
             await send_private(user_id, greeting)
-        return  # hafli user tekshiruviga o'tmasin
+        return
 
-    # ── Hafli userni qayta ban ─────────────────────────────────────────
+    by_line = f"\n👮 <b>Kim:</b> {banned_by}" if banned_by else ""
+
+    # ── 1. BAN qilindi ────────────────────────────────────────────────
+    just_banned = (
+        old_status in ("member", "administrator", "creator", "restricted", "left") and
+        new_status == "kicked"
+    )
+    if just_banned:
+        await send_log(
+            f"🚫 <b>BAN qilindi</b>\n"
+            f"👤 <b>{user_name}</b> ({username})\n"
+            f"🆔 <code>{user_id}</code>"
+            f"{by_line}"
+        )
+        logger.info(f"Ban log: {user_id} ({user_name})")
+        return
+
+    # ── 2. UNBAN qilindi ──────────────────────────────────────────────
+    just_unbanned = (
+        old_status == "kicked" and
+        new_status in ("member", "left", "restricted")
+    )
+    if just_unbanned:
+        await send_log(
+            f"✅ <b>UNBAN qilindi</b>\n"
+            f"👤 <b>{user_name}</b> ({username})\n"
+            f"🆔 <code>{user_id}</code>"
+            f"{by_line}"
+        )
+        if await is_permanently_banned(user_id):
+            try:
+                await bot.ban_chat_member(chat_id=MAIN_CHAT_ID, user_id=user_id)
+                logger.warning(f"Hafli user {user_id} qayta ban qilindi.")
+                await send_log(
+                    f"🚨 <b>Hafli user QAYTA BAN!</b>\n"
+                    f"👤 {user_name} — <code>{user_id}</code>\n"
+                    f"⚡ Kimdir unban qildi — bot qayta ban qildi."
+                )
+            except Exception as e:
+                logger.error(f"Hafli user qayta ban xatolik: {e}")
+        return
+
+    # ── 3. MUTE / UNMUTE (restricted holat o'zgardi) ──────────────────
+    if old_status in ("member", "restricted") and new_status == "restricted":
+        old_can_send = getattr(update.old_chat_member, 'can_send_messages', True)
+        new_can_send = getattr(update.new_chat_member, 'can_send_messages', True)
+        if old_can_send and not new_can_send:
+            await send_log(
+                f"🔇 <b>MUTE qilindi</b>\n"
+                f"👤 <b>{user_name}</b> ({username})\n"
+                f"🆔 <code>{user_id}</code>"
+                f"{by_line}"
+            )
+            return
+        if not old_can_send and new_can_send:
+            await send_log(
+                f"🔊 <b>UNMUTE qilindi</b>\n"
+                f"👤 <b>{user_name}</b> ({username})\n"
+                f"🆔 <code>{user_id}</code>"
+                f"{by_line}"
+            )
+            return
+
+    # ── 4. ADMIN qilindi ──────────────────────────────────────────────
+    if old_status in ("member", "restricted", "left") and new_status == "administrator":
+        await send_log(
+            f"👑 <b>ADMIN qilindi</b>\n"
+            f"👤 <b>{user_name}</b> ({username})\n"
+            f"🆔 <code>{user_id}</code>"
+            f"{by_line}"
+        )
+        return
+
+    # ── 5. ADMIN olib tashlandi ───────────────────────────────────────
+    if old_status == "administrator" and new_status == "member":
+        await send_log(
+            f"❌ <b>ADMIN olib tashlandi</b>\n"
+            f"👤 <b>{user_name}</b> ({username})\n"
+            f"🆔 <code>{user_id}</code>"
+            f"{by_line}"
+        )
+        return
+
+    # ── 6. Hafli userni qayta ban (fallback) ──────────────────────────
     was_banned = old_status in ("kicked", "restricted")
     now_free   = new_status in ("member", "administrator", "creator", "restricted", "left")
-
     if was_banned and now_free:
         if await is_permanently_banned(user_id):
             try:
                 await bot.ban_chat_member(chat_id=MAIN_CHAT_ID, user_id=user_id)
                 logger.warning(f"Hafli user {user_id} qayta ban qilindi.")
                 await send_log(
-                    f"🚨 <b>Hafli user qayta ban!</b>\n"
-                    f"👤 {user.first_name} — <code>{user_id}</code>\n"
+                    f"🚨 <b>Hafli user QAYTA BAN!</b>\n"
+                    f"👤 {user_name} — <code>{user_id}</code>\n"
                     f"⚡ Kimdir unban qildi — bot qayta ban qildi."
                 )
             except Exception as e:
