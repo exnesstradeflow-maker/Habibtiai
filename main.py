@@ -1978,7 +1978,7 @@ async def contact_admin_callback(callback: CallbackQuery):
     try: await callback.answer()
     except Exception: pass
 
-@dp.message(F.chat.type == "private")
+@dp.message(F.chat.type == "private", ~F.text.startswith("/"))
 async def handle_private_message(message: types.Message):
     user_id = message.from_user.id
     await save_user_to_db(user_id, message.from_user.username, message.from_user.first_name)
@@ -2015,9 +2015,6 @@ async def handle_private_message(message: types.Message):
             )
         return
 
-    # Buyruq bo'lsa — boshqa handlerlar qaraydi
-    if message.text and message.text.startswith("/"):
-        return
     if user_id in waiting_support or user_id in user_to_support:
         waiting_support.discard(user_id)
         header = f"💬 <b>Foydalanuvchi xabari</b>\n👤 Ism: {message.from_user.first_name}\n🆔 ID: <code>{user_id}</code>\n{'—' * 20}\n"
@@ -2116,7 +2113,7 @@ async def check_subscription(user_id: int) -> bool:
     return await user_has_started_bot(user_id)
 
 
-@dp.message(F.chat.id == MAIN_CHAT_ID, F.text)
+@dp.message(F.chat.id == MAIN_CHAT_ID, F.text, ~F.text.startswith("/"))
 async def check_text(message: types.Message):
     # Admin xabarlarini tekshirma (agar admin_rules o'chirilgan bo'lsa)
     if await is_admin(MAIN_CHAT_ID, message.from_user.id):
@@ -2432,13 +2429,16 @@ async def _build_panel(user_id: int):
 # ─────────────────────────────────────────────────────────────────────
 @dp.message(F.text == "/panel")
 async def cmd_panel(message: types.Message):
-    """Bot boshqaruv paneli — bot adminlari va guruh adminlari uchun."""
+    """Bot boshqaruv paneli — bot adminlari va guruh adminlari uchun.
+    Guruhda ham, private chatda ham ishlaydi.
+    """
     user_id = message.from_user.id
-    is_gadmin  = await is_bot_admin(user_id)
+    is_gadmin   = await is_bot_admin(user_id)
     is_grpadmin = await is_admin(MAIN_CHAT_ID, user_id)
 
     if not (is_gadmin or is_grpadmin):
-        return  # Ruxsatsiz foydalanuvchi — jim o'tkazib yubor
+        # Jim o'tkazib yubor yoki xabar ko'rsatma
+        return
 
     text, markup = await _build_panel(user_id)
     await message.answer(text, parse_mode="HTML", reply_markup=markup)
