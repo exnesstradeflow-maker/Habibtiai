@@ -1686,78 +1686,7 @@ async def check_sticker(message: types.Message):
         await handle_user_penalty(message, reason="Odobsiz stiker")
 
 # ─────────────────────────────────────────────────────────────────────
-# /id — Foydalanuvchi ma'lumotlari kartochkasi (user "yegish")
-# ─────────────────────────────────────────────────────────────────────
-@dp.message(F.text.startswith("/id"), F.chat.id == MAIN_CHAT_ID)
-async def cmd_id(message: types.Message):
-    """Reply qilingan yoki berilgan foydalanuvchining ma'lumotlari."""
-    if not await is_admin(MAIN_CHAT_ID, message.from_user.id):
-        return
-
-    if message.reply_to_message:
-        target     = message.reply_to_message.from_user
-        target_id  = target.id
-        first_name = target.first_name or ""
-        last_name  = target.last_name or ""
-        username   = target.username
-    else:
-        parts = message.text.split()
-        if len(parts) > 1:
-            arg = parts[1]
-            if arg.isdigit():
-                target_id = int(arg)
-                try:
-                    chat_m = await bot.get_chat_member(MAIN_CHAT_ID, target_id)
-                    first_name = chat_m.user.first_name or ""
-                    last_name  = chat_m.user.last_name or ""
-                    username   = chat_m.user.username
-                except Exception:
-                    first_name, last_name, username = "", "", None
-            elif arg.startswith("@"):
-                try:
-                    chat_obj = await bot.get_chat(arg)
-                    target_id  = chat_obj.id
-                    first_name = chat_obj.first_name or ""
-                    last_name  = chat_obj.last_name or ""
-                    username   = chat_obj.username
-                except Exception:
-                    return await message.reply(f"❌ Foydalanuvchi topilmadi: {arg}")
-            else:
-                return await message.reply("❗ /id reply | /id @username | /id ID")
-        else:
-            # O'zi haqida
-            target_id  = message.from_user.id
-            first_name = message.from_user.first_name or ""
-            last_name  = message.from_user.last_name or ""
-            username   = message.from_user.username
-
-    full_name   = (first_name + (" " + last_name if last_name else "")).strip() or "Noma'lum"
-    warn_count  = await get_warning(target_id)
-    is_tg_admin = await is_admin(MAIN_CHAT_ID, target_id)
-    status_icon = "👑 Admin" if is_tg_admin else "👤 A'zo"
-    username_line = f"<a href='https://t.me/{username}'>@{username}</a>" if username else "—"
-
-    text = (
-        "👤 <b>Foydalanuvchi Ma'lumotlari</b>\n"
-        "━━━━━━━━━━━━━━━━━━━━\n"
-        f"📛 <b>Ism:</b> {full_name}\n"
-        f"🔖 <b>Username:</b> {username_line}\n"
-        f"🆔 <b>ID:</b> <code>{target_id}</code>\n"
-        f"📌 <b>Holat:</b> {status_icon}\n"
-        f"⚠️ <b>Ogohlantirishlar:</b> {warn_count}/3\n"
-        "━━━━━━━━━━━━━━━━━━━━"
-    )
-    markup = InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(text=f"⚠️ Warn ({warn_count}/3)", callback_data=f"mod_warn_{target_id}"),
-            InlineKeyboardButton(text="✅ Unwarn",                  callback_data=f"mod_unwarn_{target_id}"),
-        ],
-        [
-            InlineKeyboardButton(text="🔇 Mute", callback_data=f"mod_mute_{target_id}"),
-            InlineKeyboardButton(text="🚫 Ban",  callback_data=f"mod_ban_{target_id}"),
-        ],
-    ])
-    await message.reply(text, parse_mode="HTML", reply_markup=markup, disable_web_page_preview=True)
+# /id komandasi moderator.py (MOD) orqali boshqariladi
 
 
 # ─────────────────────────────────────────────────────────────────────
