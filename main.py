@@ -2652,30 +2652,25 @@ async def on_join_request(update: types.ChatJoinRequest):
                 logger.error(f"Hafli user join rad etishda xatolik: {e}")
             return
 
-        # Ariza qabul qilish yoqiq/o'chiqligini tekshiramiz
-        join_active = await is_join_request_enabled_in_db()
-        if not join_active:
-            try:
-                await bot.decline_chat_join_request(MAIN_CHAT_ID, update.from_user.id)
-                await send_private(
-                    update.from_user.id,
-                    "❌ Guruhga kirish hozircha yopiq.\n"
-                    "Admin bilan bog'laning: @admin"
-                )
-            except Exception as e:
-                logger.error(f"Ariza rad etishda xatolik: {e}")
+        # Avto-qabul va kaptcha holatlarini tekshiramiz
+        join_active    = await is_join_request_enabled_in_db()
+        captcha_active = await is_captcha_enabled_in_db()
+
+        # Agar ikkisi ham o'chiq bo'lsa — bot zayafkaga UMUMAN tegmasin
+        if not join_active and not captcha_active:
             return
 
-        # DB dagi BotSetting holatini tekshiramiz
-        captcha_active = await is_captcha_enabled_in_db()
+        # Kaptcha yoqiq bo'lsa — kaptcha yuboramiz (join_active dan qat'iy nazar)
         if captcha_active:
             await send_captcha(update.from_user.id, update.from_user.first_name)
-        else:
-            try:
-                await bot.approve_chat_join_request(MAIN_CHAT_ID, update.from_user.id)
-                await send_private(update.from_user.id, "✅ Guruhga xush kelibsiz! 🎉")
-            except Exception as e:
-                logger.error(f"To'g'ridan-to'g'ri qabul qilishda xatolik: {e}")
+            return
+
+        # Faqat avto-qabul yoqiq, kaptcha o'chiq — to'g'ridan qabul
+        try:
+            await bot.approve_chat_join_request(MAIN_CHAT_ID, update.from_user.id)
+            await send_private(update.from_user.id, "✅ Guruhga xush kelibsiz! 🎉")
+        except Exception as e:
+            logger.error(f"To'g'ridan-to'g'ri qabul qilishda xatolik: {e}")
 
 
 @dp.chat_member()
