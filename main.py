@@ -88,7 +88,7 @@ if not settings.configured:
             'django.contrib.sessions',
             'django.contrib.messages',
             'django.contrib.staticfiles',
-            '__main__.HabibtiAppConfig',
+            '__main__',
         ],
         ROOT_URLCONF='__main__',
         MIDDLEWARE=[
@@ -210,19 +210,6 @@ if not settings.configured:
         },
     )
     django.setup()
-
-
-# =====================================================================
-# 3b. APP CONFIGURATION (Sidebar da to'g'ri nom ko'rsatish uchun)
-# =====================================================================
-from django.apps import AppConfig as DjangoAppConfig
-
-class HabibtiAppConfig(DjangoAppConfig):
-    name         = '__main__'
-    label        = '__main__'
-    verbose_name = '🤖 Habibti Bot'
-
-
 
 
 # =====================================================================
