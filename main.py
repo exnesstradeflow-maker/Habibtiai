@@ -88,7 +88,7 @@ if not settings.configured:
             'django.contrib.sessions',
             'django.contrib.messages',
             'django.contrib.staticfiles',
-            '__main__',
+            '__main__.HabibtiAppConfig',
         ],
         ROOT_URLCONF='__main__',
         MIDDLEWARE=[
@@ -136,7 +136,7 @@ if not settings.configured:
             "site_brand":    "⚜ Mafia Habibiti",
             "welcome_sign":  "Boshqaruv Paneliga Xush Kelibsiz!",
             "copyright":     "Mafia Habibiti Inc",
-            "search_model": ["auth.User", "__main__.BadWord", "__main__.BotAdmin", "__main__.BotOwner", "__main__.TelegramUser", "__main__.BannedUser"],
+            "search_model": ["__main__.BotAdmin", "__main__.TelegramUser"],
             "show_sidebar":          True,
             "navigation_expanded":   True,
             "hide_apps":             [],
@@ -210,6 +210,20 @@ if not settings.configured:
         },
     )
     django.setup()
+
+
+# =====================================================================
+# 3b. APP CONFIGURATION (Sidebar da to'g'ri nom ko'rsatish uchun)
+# =====================================================================
+from django.apps import AppConfig as DjangoAppConfig
+
+class HabibtiAppConfig(DjangoAppConfig):
+    name         = '__main__'
+    label        = '__main__'
+    verbose_name = '🤖 Habibti Bot'
+
+
+
 
 # =====================================================================
 # 4. MODELLAR
