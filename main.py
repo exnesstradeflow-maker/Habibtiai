@@ -52,7 +52,7 @@ logging.getLogger("django.request").setLevel(logging.ERROR)
 logging.getLogger("django.server").setLevel(logging.ERROR)
 
 # =====================================================================
-# 3. DJANGO SOZLAMALARI — MAFIA HABIBITI PREMIUM DARK GOLD DIZAYN
+# 3. DJANGO SOZLAMALARI â MAFIA HABIBITI PREMIUM DARK GOLD DIZAYN
 # =====================================================================
 import django
 from django.conf import settings
@@ -81,7 +81,7 @@ if not settings.configured:
             )
         },
         INSTALLED_APPS=[
-            'jazzmin',           # ← Birinchi bo'lishi SHART
+            'jazzmin',           # â Birinchi bo'lishi SHART
             'django.contrib.admin',
             'django.contrib.auth',
             'django.contrib.contenttypes',
@@ -93,7 +93,7 @@ if not settings.configured:
         ROOT_URLCONF='__main__',
         MIDDLEWARE=[
             'django.middleware.security.SecurityMiddleware',
-            'whitenoise.middleware.WhiteNoiseMiddleware',  # 🚀 RAILWAY'DA DIZAYN CHIQISHI UCHUN QO'SHILDI!
+            'whitenoise.middleware.WhiteNoiseMiddleware',  # ð RAILWAY'DA DIZAYN CHIQISHI UCHUN QO'SHILDI!
             'django.contrib.sessions.middleware.SessionMiddleware',
             'django.middleware.common.CommonMiddleware',
             'django.middleware.csrf.CsrfViewMiddleware',
@@ -103,7 +103,7 @@ if not settings.configured:
         ],
         TEMPLATES=[{
             'BACKEND': 'django.template.backends.django.DjangoTemplates',
-            'DIRS': [],
+            'DIRS': [os.path.join(BASE_DIR, 'templates')],
             'APP_DIRS': True,
             'OPTIONS': {
                 'context_processors': [
@@ -117,9 +117,9 @@ if not settings.configured:
 
         STATIC_URL='/static/',
         STATICFILES_DIRS=[
-            os.path.join(BASE_DIR, 'static'),   # ← mafia_custom.css shu yerda
+            os.path.join(BASE_DIR, 'static'),   # â mafia_custom.css shu yerda
         ],
-        STATIC_ROOT=os.path.join(BASE_DIR, 'staticfiles'), # 🚀 DIZAYNLARNI JAMLOVCHI PAPKA!
+        STATIC_ROOT=os.path.join(BASE_DIR, 'staticfiles'), # ð DIZAYNLARNI JAMLOVCHI PAPKA!
 
         ALLOWED_HOSTS=['*'],
         CSRF_TRUSTED_ORIGINS=[
@@ -132,8 +132,8 @@ if not settings.configured:
 
         JAZZMIN_SETTINGS={
             "site_title":    "Mafia Habibiti Admin",
-            "site_header":   "⚜ Mafia Habibiti",
-            "site_brand":    "⚜ Mafia Habibiti",
+            "site_header":   "â Mafia Habibiti",
+            "site_brand":    "â Mafia Habibiti",
             "welcome_sign":  "Boshqaruv Paneliga Xush Kelibsiz!",
             "copyright":     "Mafia Habibiti Inc",
             "search_model": ["auth.User", "__main__.BadWord", "__main__.BotAdmin", "__main__.BotOwner", "__main__.TelegramUser", "__main__.BannedUser"],
@@ -148,6 +148,8 @@ if not settings.configured:
                 "__main__.BotAdmin":         "fas fa-user-cog",
                 "__main__.BotOwner":         "fas fa-crown",
                 "__main__.BotStats":         "fas fa-chart-bar",
+                "__main__.DailyStats":       "fas fa-calendar-alt",
+                "__main__.GroupActivity":    "fas fa-users",
                 "__main__.TelegramUser":     "fas fa-users",
                 "__main__.BroadcastMessage": "fas fa-paper-plane",
                 "__main__.BadWord":          "fas fa-ban",
@@ -163,6 +165,8 @@ if not settings.configured:
                 "__main__.BotSetting",
                 "__main__.BotOwner",
                 "__main__.BotStats",
+                "__main__.DailyStats",
+                "__main__.GroupActivity",
                 "__main__.BotAdmin",
                 "__main__.GroupMessage",
                 "__main__.GroupRule",
@@ -211,31 +215,31 @@ if not settings.configured:
 # 4. MODELLAR
 # =====================================================================
 class BotSetting(models.Model):
-    is_captcha_active      = models.BooleanField("Kaptcha faolmi? / Активна ли каптча?", default=True)
-    is_link_active         = models.BooleanField("Havola olish faolmi? / Активна ли кнопка ссылки?", default=True)
-    is_join_request_active   = models.BooleanField("Arizalarni qabul qilsinmi? / Принимать заявки?", default=True)
+    is_captcha_active      = models.BooleanField("Kaptcha faolmi? / ÐÐºÑÐ¸Ð²Ð½Ð° Ð»Ð¸ ÐºÐ°Ð¿ÑÑÐ°?", default=True)
+    is_link_active         = models.BooleanField("Havola olish faolmi? / ÐÐºÑÐ¸Ð²Ð½Ð° Ð»Ð¸ ÐºÐ½Ð¾Ð¿ÐºÐ° ÑÑÑÐ»ÐºÐ¸?", default=True)
+    is_join_request_active   = models.BooleanField("Arizalarni qabul qilsinmi? / ÐÑÐ¸Ð½Ð¸Ð¼Ð°ÑÑ Ð·Ð°ÑÐ²ÐºÐ¸?", default=True)
     is_subscription_active   = models.BooleanField(
-        "Botga /start bosmaganlar yoza olmasinmi? / Блокировать незарегистрированных?",
+        "Botga /start bosmaganlar yoza olmasinmi? / ÐÐ»Ð¾ÐºÐ¸ÑÐ¾Ð²Ð°ÑÑ Ð½ÐµÐ·Ð°ÑÐµÐ³Ð¸ÑÑÑÐ¸ÑÐ¾Ð²Ð°Ð½Ð½ÑÑ?",
         default=False,
-        help_text="Yoqilsa — botga /start bosmagan foydalanuvchilar guruhda yoza olmaydi."
+        help_text="Yoqilsa â botga /start bosmagan foydalanuvchilar guruhda yoza olmaydi."
     )
     admin_rules_active = models.BooleanField(
         "Qoidalar adminlarga ham ishlashmi?",
         default=False,
-        help_text="Yoqilsa — adminlar ham so'kinish va rasm tekshiruviga uchraydi (AdminViolation sifatida hisoblanadi)."
+        help_text="Yoqilsa â adminlar ham so'kinish va rasm tekshiruviga uchraydi (AdminViolation sifatida hisoblanadi)."
     )
 
     class Meta:
         app_label = '__main__'
         verbose_name = "Bot Sozlamasi"
-        verbose_name_plural = "⚙ Bot Sozlamalari"
+        verbose_name_plural = "â Bot Sozlamalari"
 
     def __str__(self):
         return "Tizim Sozlamalari"
 
 
 class BotAdmin(models.Model):
-    """Bot adminlari — faqat admin panel orqali qo'shiladi."""
+    """Bot adminlari â faqat admin panel orqali qo'shiladi."""
     user_id    = models.BigIntegerField("Telegram ID", unique=True)
     username   = models.CharField("Username (ixtiyoriy)", max_length=150, null=True, blank=True)
     first_name = models.CharField("Ismi", max_length=150, null=True, blank=True)
@@ -247,7 +251,7 @@ class BotAdmin(models.Model):
     class Meta:
         app_label = '__main__'
         verbose_name = "Bot Admini"
-        verbose_name_plural = "🤖 Bot Adminlari"
+        verbose_name_plural = "ð¤ Bot Adminlari"
 
 
 class TelegramUser(models.Model):
@@ -262,7 +266,7 @@ class TelegramUser(models.Model):
     class Meta:
         app_label = '__main__'
         verbose_name = "Bot Foydalanuvchisi"
-        verbose_name_plural = "👥 Bot Foydalanuvchilari"
+        verbose_name_plural = "ð¥ Bot Foydalanuvchilari"
 
 
 class BroadcastMessage(models.Model):
@@ -274,13 +278,13 @@ class BroadcastMessage(models.Model):
     class Meta:
         app_label = '__main__'
         verbose_name = "Xabarnoma yuborish"
-        verbose_name_plural = "📢 Hammaga Xabar Yuborish (Rassilka)"
+        verbose_name_plural = "ð¢ Hammaga Xabar Yuborish (Rassilka)"
 
 
 async def _do_broadcast(msg):
     """BroadcastMessage ni barcha foydalanuvchilarga yuboradi."""
     users = await sync_to_async(list)(TelegramUser.objects.all())
-    logger.info(f"📢 Rassilka boshlandi. Jami: {len(users)}")
+    logger.info(f"ð¢ Rassilka boshlandi. Jami: {len(users)}")
     success, failed = 0, 0
     for u in users:
         try:
@@ -294,7 +298,7 @@ async def _do_broadcast(msg):
             failed += 1
             logger.error(f"Rassilka xatolik user {u.user_id}: {e}")
     await sync_to_async(BroadcastMessage.objects.filter(pk=msg.pk).update)(is_sent=True)
-    logger.info(f"📢 Rassilka yakunlandi! Muvaffaqiyatli: {success}, Xatolik: {failed}")
+    logger.info(f"ð¢ Rassilka yakunlandi! Muvaffaqiyatli: {success}, Xatolik: {failed}")
 
 
 async def _do_send_to_group(msg):
@@ -319,7 +323,7 @@ async def _do_send_to_group(msg):
             except Exception as e:
                 logger.error(f"Pin xatolik: {e}")
         await sync_to_async(GroupMessage.objects.filter(pk=msg.pk).update)(is_sent=True)
-        await send_log(f"📣 <b>Guruhga xabar yuborildi (Admin panel)</b>\n📝 {msg.text[:100]}...")
+        await send_log(f"ð£ <b>Guruhga xabar yuborildi (Admin panel)</b>\nð {msg.text[:100]}...")
         logger.info(f"Guruh xabari #{msg.pk} yuborildi.")
     except Exception as e:
         logger.error(f"Guruh xabari xatolik: {e}")
@@ -338,30 +342,30 @@ def get_active_rules() -> str | None:
 
 
 class BadWord(models.Model):
-    word = models.CharField("Taqiqlangan so'z / Запрещённое слово", max_length=100, unique=True)
+    word = models.CharField("Taqiqlangan so'z / ÐÐ°Ð¿ÑÐµÑÑÐ½Ð½Ð¾Ðµ ÑÐ»Ð¾Ð²Ð¾", max_length=100, unique=True)
     def __str__(self): return self.word
     class Meta:
         app_label = '__main__'
         verbose_name = "Taqiqlangan so'z"
-        verbose_name_plural = "🚫 Taqiqlangan so'zlar / Запрещённые слова"
+        verbose_name_plural = "ð« Taqiqlangan so'zlar / ÐÐ°Ð¿ÑÐµÑÑÐ½Ð½ÑÐµ ÑÐ»Ð¾Ð²Ð°"
 
 
 class UserWarning(models.Model):
-    user_id = models.BigIntegerField("Foydalanuvchi ID / ID пользователя", primary_key=True)
-    count = models.IntegerField("Ogohlantirishlar soni / Кол-во предупреждений", default=0)
+    user_id = models.BigIntegerField("Foydalanuvchi ID / ID Ð¿Ð¾Ð»ÑÐ·Ð¾Ð²Ð°ÑÐµÐ»Ñ", primary_key=True)
+    count = models.IntegerField("Ogohlantirishlar soni / ÐÐ¾Ð»-Ð²Ð¾ Ð¿ÑÐµÐ´ÑÐ¿ÑÐµÐ¶Ð´ÐµÐ½Ð¸Ð¹", default=0)
     class Meta:
         app_label = '__main__'
         verbose_name = "Foydalanuvchi ogohlantirishi"
-        verbose_name_plural = "⚠️ Ogohlantirishlar / Предупреждения"
+        verbose_name_plural = "â ï¸ Ogohlantirishlar / ÐÑÐµÐ´ÑÐ¿ÑÐµÐ¶Ð´ÐµÐ½Ð¸Ñ"
 
 
 class AdminViolation(models.Model):
-    user_id = models.BigIntegerField("Admin ID / ID админа", primary_key=True)
-    count = models.IntegerField("Qoida buzish soni / Кол-во нарушения", default=0)
+    user_id = models.BigIntegerField("Admin ID / ID Ð°Ð´Ð¼Ð¸Ð½Ð°", primary_key=True)
+    count = models.IntegerField("Qoida buzish soni / ÐÐ¾Ð»-Ð²Ð¾ Ð½Ð°ÑÑÑÐµÐ½Ð¸Ñ", default=0)
     class Meta:
         app_label = '__main__'
         verbose_name = "Admin xatosi"
-        verbose_name_plural = "👮 Admin xatolari / Нарушения админов"
+        verbose_name_plural = "ð® Admin xatolari / ÐÐ°ÑÑÑÐµÐ½Ð¸Ñ Ð°Ð´Ð¼Ð¸Ð½Ð¾Ð²"
 
 
 class UserLink(models.Model):
@@ -390,11 +394,11 @@ class BannedUser(models.Model):
     class Meta:
         app_label = '__main__'
         verbose_name = "Hafli foydalanuvchi"
-        verbose_name_plural = "🚨 Hafli Foydalanuvchilar (Permanent Ban)"
+        verbose_name_plural = "ð¨ Hafli Foydalanuvchilar (Permanent Ban)"
 
 
 class BotOwner(models.Model):
-    """Bot egasi — bot guruhga qo'shilganida shu odamni avtomatik admin qiladi."""
+    """Bot egasi â bot guruhga qo'shilganida shu odamni avtomatik admin qiladi."""
     user_id    = models.BigIntegerField("Telegram ID", unique=True)
     username   = models.CharField("Username (ixtiyoriy)", max_length=150, null=True, blank=True)
     first_name = models.CharField("Ismi (ixtiyoriy)", max_length=150, null=True, blank=True)
@@ -405,11 +409,11 @@ class BotOwner(models.Model):
     class Meta:
         app_label = '__main__'
         verbose_name = "Bot Egasi"
-        verbose_name_plural = "👑 Bot Egasi (Owner)"
+        verbose_name_plural = "ð Bot Egasi (Owner)"
 
 
 class BotStats(models.Model):
-    """Bot statistikasi — yagona yozuv, avtomatik yangilanadi."""
+    """Bot statistikasi â yagona yozuv, avtomatik yangilanadi."""
     total_links_given    = models.IntegerField("Jami havola berildi",        default=0)
     total_captcha_passed = models.IntegerField("Kaptcha muvaffaqiyatli o'tdi", default=0)
     total_blocked        = models.IntegerField("Bot tomonidan blok qilindi",  default=0)
@@ -420,11 +424,50 @@ class BotStats(models.Model):
     class Meta:
         app_label = '__main__'
         verbose_name = "Statistika"
-        verbose_name_plural = "📈 Bot Statistikasi"
+        verbose_name_plural = "ð Bot Statistikasi"
+
+
+class DailyStats(models.Model):
+    """Kunlik statistika â har kun avtomatik yig'iladi."""
+    date            = models.DateField("Sana", unique=True)
+    warns_given     = models.IntegerField("Berilgan warnlar",        default=0)
+    bans_given      = models.IntegerField("Berilgan banlar",         default=0)
+    links_given     = models.IntegerField("Berilgan havolalar",      default=0)
+    new_members     = models.IntegerField("Yangi a'zolar",           default=0)
+    admin_violations= models.IntegerField("Admin qoida buzishlari",  default=0)
+    messages_count  = models.IntegerField("Xabarlar soni",           default=0)
+
+    def __str__(self):
+        return f"Statistika: {self.date}"
+
+    class Meta:
+        app_label = '__main__'
+        verbose_name = "Kunlik Statistika"
+        verbose_name_plural = "ð Kunlik Statistika"
+        ordering = ['-date']
+
+
+class GroupActivity(models.Model):
+    """Guruhda faol bo'lgan a'zolar â xabar yozgan kunlar."""
+    user_id     = models.BigIntegerField("Foydalanuvchi ID")
+    first_name  = models.CharField("Ismi", max_length=150, null=True, blank=True)
+    username    = models.CharField("Username", max_length=150, null=True, blank=True)
+    date        = models.DateField("Sana")
+    msg_count   = models.IntegerField("Xabarlar soni", default=1)
+
+    class Meta:
+        app_label = '__main__'
+        verbose_name = "Guruh Faolligi"
+        verbose_name_plural = "ð¥ Guruh Faolligi"
+        unique_together = ('user_id', 'date')
+        ordering = ['-date', '-msg_count']
+
+    def __str__(self):
+        return f"{self.first_name or self.user_id} â {self.date}"
 
 
 class GroupRule(models.Model):
-    """Guruh qoidalari — yangi a'zoga lichkaga yuboriladi."""
+    """Guruh qoidalari â yangi a'zoga lichkaga yuboriladi."""
     title = models.CharField(
         "Sarlavha",
         max_length=200,
@@ -483,16 +526,16 @@ if not admin.site.is_registered(BotSetting):
     class BotSettingAdmin(admin.ModelAdmin):
         list_display  = ('__str__', 'is_captcha_active', 'is_link_active', 'is_join_request_active', 'is_subscription_active', 'admin_rules_active')
         fieldsets = (
-            ("⚙️ Bot Sozlamalari", {
+            ("âï¸ Bot Sozlamalari", {
                 'fields': ('is_captcha_active', 'is_link_active', 'is_join_request_active', 'is_subscription_active', 'admin_rules_active'),
                 'description': (
                     '<p style="color:#ffd700; font-size:13px;">'
-                    '⚙️ Bu yerda botning asosiy funksiyalarini yoqib/o\'chirishingiz mumkin.<br>'
-                    '🔐 <b>Kaptcha</b> — Guruhga kirmoqchi bo\'lganlar uchun rasm-kod tekshiruvi.<br>'
-                    '🔗 <b>Havola olish</b> — Foydalanuvchilar bot orqali guruhga link ola olishi.<br>'
-                    '🚪 <b>Arizalarni qabul qilish</b> — Guruhga qo\'shilish arizalarini avtomatik qabul/rad qilish.<br>'
-                    '🤖 <b>Bot start tekshiruvi</b> — Botga /start bosmagan foydalanuvchilar guruhda yoza olmaydi.<br>'
-                    '👮 <b>Admin qoidalari</b> — Yoqilsa, adminlar ham so\'kinish/rasm tekshiruviga uchraydi.'
+                    'âï¸ Bu yerda botning asosiy funksiyalarini yoqib/o\'chirishingiz mumkin.<br>'
+                    'ð <b>Kaptcha</b> â Guruhga kirmoqchi bo\'lganlar uchun rasm-kod tekshiruvi.<br>'
+                    'ð <b>Havola olish</b> â Foydalanuvchilar bot orqali guruhga link ola olishi.<br>'
+                    'ðª <b>Arizalarni qabul qilish</b> â Guruhga qo\'shilish arizalarini avtomatik qabul/rad qilish.<br>'
+                    'ð¤ <b>Bot start tekshiruvi</b> â Botga /start bosmagan foydalanuvchilar guruhda yoza olmaydi.<br>'
+                    'ð® <b>Admin qoidalari</b> â Yoqilsa, adminlar ham so\'kinish/rasm tekshiruviga uchraydi.'
                     '</p>'
                 )
             }),
@@ -506,12 +549,12 @@ if not admin.site.is_registered(BotAdmin):
         ordering      = ('-added_at',)
         readonly_fields = ('added_at',)
         fieldsets = (
-            ("🤖 Bot Admini Ma'lumotlari", {
+            ("ð¤ Bot Admini Ma'lumotlari", {
                 'fields': ('user_id', 'username', 'first_name'),
                 'description': (
                     '<p style="color:#ffd700; font-size:13px;">'
-                    '🤖 Bot adminlari — /status komandasi va bot funksiyalarini boshqara oladigan odamlar.<br>'
-                    '⚠️ Faqat shu yerdan qo\'shilgan Telegram ID egalari bot admini hisoblanadi.'
+                    'ð¤ Bot adminlari â /status komandasi va bot funksiyalarini boshqara oladigan odamlar.<br>'
+                    'â ï¸ Faqat shu yerdan qo\'shilgan Telegram ID egalari bot admini hisoblanadi.'
                     '</p>'
                 )
             }),
@@ -537,15 +580,15 @@ if not admin.site.is_registered(BroadcastMessage):
                 def run(m=msg):
                     try:
                         if _main_loop is None:
-                            logger.error("❌ Asosiy event loop tayyor emas!")
+                            logger.error("â Asosiy event loop tayyor emas!")
                             return
                         future = asyncio.run_coroutine_threadsafe(_do_broadcast(m), _main_loop)
                         future.result(timeout=300)
                     except Exception as e:
                         logger.error(f"Broadcast thread xatolik: {e}")
                 threading.Thread(target=run, daemon=True).start()
-            self.message_user(request, "✅ Rassilka ishga tushirildi!")
-        send_broadcast_action.short_description = "📢 Tanlangan xabarlarni yuborish"
+            self.message_user(request, "â Rassilka ishga tushirildi!")
+        send_broadcast_action.short_description = "ð¢ Tanlangan xabarlarni yuborish"
 
 if not admin.site.is_registered(BadWord):
     @admin.register(BadWord)
@@ -582,7 +625,7 @@ if not admin.site.is_registered(BannedUser):
                             await bot.ban_chat_member(chat_id=MAIN_CHAT_ID, user_id=uid)
                             await send_log(
                                 f"\U0001f6a8 <b>Hafli user banlandi!</b>\n"
-                                f"\U0001f464 {fname or 'User'} — <code>{uid}</code>\n"
+                                f"\U0001f464 {fname or 'User'} â <code>{uid}</code>\n"
                                 f"\U0001f4dd Sabab: {reason or 'ko\'rsatilmagan'}"
                             )
                             logger.info(f"Hafli user {uid} darhol banlandi.")
@@ -600,15 +643,15 @@ if not admin.site.is_registered(BotOwner):
         list_display  = ('user_id', 'username', 'first_name')
         search_fields = ('user_id', 'username', 'first_name')
         fieldsets = (
-            ("👑 Bot Egasi Ma'lumotlari", {
+            ("ð Bot Egasi Ma'lumotlari", {
                 'fields': ('user_id', 'username', 'first_name'),
                 'description': (
                     '<p style="color:#ffd700; font-size:13px;">'
-                    '👑 <b>Bot Egasi</b> — bot qaysi guruhga qo\'shilmasin, '
+                    'ð <b>Bot Egasi</b> â bot qaysi guruhga qo\'shilmasin, '
                     'avtomatik ravishda botning barcha admin huquqlari beriladi.<br>'
-                    '⚠️ Faqat <b>bitta</b> bot egasini qo\'shish tavsiya etiladi.<br>'
-                    '📌 Telegram ID ni raqam ko\'rinishida kiriting (masalan: 123456789).<br>'
-                    '🔍 ID ni bilish uchun: @userinfobot botga /start yozing.'
+                    'â ï¸ Faqat <b>bitta</b> bot egasini qo\'shish tavsiya etiladi.<br>'
+                    'ð Telegram ID ni raqam ko\'rinishida kiriting (masalan: 123456789).<br>'
+                    'ð ID ni bilish uchun: @userinfobot botga /start yozing.'
                     '</p>'
                 )
             }),
@@ -618,7 +661,7 @@ if not admin.site.is_registered(BotOwner):
             super().save_model(request, obj, form, change)
             self.message_user(
                 request,
-                f"✅ Bot egasi ({obj.user_id}) saqlandi. "
+                f"â Bot egasi ({obj.user_id}) saqlandi. "
                 "Bot keyingi guruhga qo'shilganida uni avtomatik admin qiladi.",
             )
 
@@ -636,7 +679,7 @@ if not admin.site.is_registered(BotStats):
             'get_total_users', 'get_total_bans', 'get_total_warns',
         )
         fieldsets = (
-            ("📈 Statistika (avtomatik)", {
+            ("ð Statistika (avtomatik)", {
                 'fields': (
                     'get_total_users', 'total_links_given',
                     'total_captcha_passed', 'total_blocked',
@@ -644,26 +687,26 @@ if not admin.site.is_registered(BotStats):
                 ),
                 'description': (
                     '<p style="color:#ffd700; font-size:13px;">'
-                    '📈 Bu sahifa botning umumiy statistikasini ko\'rsatadi.<br>'
-                    '♻️ Sahifani yangilash uchun F5 bosing.'
+                    'ð Bu sahifa botning umumiy statistikasini ko\'rsatadi.<br>'
+                    'â»ï¸ Sahifani yangilash uchun F5 bosing.'
                     '</p>'
                 )
             }),
         )
 
         def get_total_users(self, obj):
-            return f"👥 {TelegramUser.objects.count():,} ta"
+            return f"ð¥ {TelegramUser.objects.count():,} ta"
         get_total_users.short_description = "Jami foydalanuvchi"
 
         def get_total_bans(self, obj):
-            return f"🚫 {BannedUser.objects.count():,} ta"
+            return f"ð« {BannedUser.objects.count():,} ta"
         get_total_bans.short_description = "Permanent ban"
 
         def get_total_warns(self, obj):
             from django.db.models import Sum
             total = UserWarning.objects.aggregate(total=Sum('count'))['total'] or 0
             users = UserWarning.objects.filter(count__gt=0).count()
-            return f"⚠️ {total} ta ({users} foydalanuvchi)"
+            return f"â ï¸ {total} ta ({users} foydalanuvchi)"
         get_total_warns.short_description = "Jami ogohlantirishlar"
 
         def has_add_permission(self, request):
@@ -671,6 +714,142 @@ if not admin.site.is_registered(BotStats):
 
         def has_delete_permission(self, request, obj=None):
             return False
+
+
+if not admin.site.is_registered(DailyStats):
+    @admin.register(DailyStats)
+    class DailyStatsAdmin(admin.ModelAdmin):
+        list_display = ('date', 'warns_given', 'bans_given', 'links_given',
+                        'new_members', 'admin_violations', 'messages_count')
+        readonly_fields = ('date', 'warns_given', 'bans_given', 'links_given',
+                           'new_members', 'admin_violations', 'messages_count')
+        ordering = ('-date',)
+        list_per_page = 30
+        date_hierarchy = 'date'
+
+        def has_add_permission(self, request):
+            return False
+
+        def has_delete_permission(self, request, obj=None):
+            return False
+
+        def changelist_view(self, request, extra_context=None):
+            """Grafik bilan statistika sahifasi."""
+            import json
+            from datetime import date, timedelta
+
+            # Oxirgi 30 kun statistikasi
+            today = date.today()
+            start = today - timedelta(days=29)
+            qs = DailyStats.objects.filter(date__gte=start).order_by('date')
+
+            labels = []
+            warns_data = []
+            bans_data  = []
+            links_data = []
+            members_data = []
+            violations_data = []
+
+            for row in qs:
+                labels.append(row.date.strftime("%d.%m"))
+                warns_data.append(row.warns_given)
+                bans_data.append(row.bans_given)
+                links_data.append(row.links_given)
+                members_data.append(row.new_members)
+                violations_data.append(row.admin_violations)
+
+            # Umumiy ko'rsatkichlar
+            total_warns = sum(warns_data)
+            total_bans  = sum(bans_data)
+            total_links = sum(links_data)
+            total_mem   = sum(members_data)
+            total_viol  = sum(violations_data)
+
+            extra_context = extra_context or {}
+            extra_context.update({
+                'chart_labels':   json.dumps(labels),
+                'chart_warns':    json.dumps(warns_data),
+                'chart_bans':     json.dumps(bans_data),
+                'chart_links':    json.dumps(links_data),
+                'chart_members':  json.dumps(members_data),
+                'chart_violations': json.dumps(violations_data),
+                'total_warns':    total_warns,
+                'total_bans':     total_bans,
+                'total_links':    total_links,
+                'total_members':  total_mem,
+                'total_violations': total_viol,
+                'stats_title':    'Oxirgi 30 kunlik statistika',
+            })
+            return super().changelist_view(request, extra_context=extra_context)
+
+
+if not admin.site.is_registered(GroupActivity):
+    @admin.register(GroupActivity)
+    class GroupActivityAdmin(admin.ModelAdmin):
+        list_display = ('date', 'user_display', 'msg_count')
+        readonly_fields = ('user_id', 'first_name', 'username', 'date', 'msg_count')
+        list_filter = ('date',)
+        search_fields = ('first_name', 'username', 'user_id')
+        ordering = ('-date', '-msg_count')
+        list_per_page = 50
+        date_hierarchy = 'date'
+
+        def user_display(self, obj):
+            uname = f" (@{obj.username})" if obj.username else ""
+            return f"{obj.first_name or 'Noma\'lum'}{uname} [{obj.user_id}]"
+        user_display.short_description = "Foydalanuvchi"
+
+        def has_add_permission(self, request):
+            return False
+
+        def has_delete_permission(self, request, obj=None):
+            return False
+
+        def changelist_view(self, request, extra_context=None):
+            """Guruh faollik grafigi."""
+            import json
+            from datetime import date, timedelta
+
+            today = date.today()
+            start = today - timedelta(days=29)
+
+            # Har kun nechta unique user faol bo'lgan
+            from django.db.models import Count as DjCount
+            daily_active = (
+                GroupActivity.objects
+                .filter(date__gte=start)
+                .values('date')
+                .annotate(active_users=DjCount('user_id', distinct=True),
+                          total_msgs=models.Sum('msg_count'))
+                .order_by('date')
+            )
+
+            labels = []
+            active_data = []
+            msgs_data   = []
+            for row in daily_active:
+                labels.append(row['date'].strftime("%d.%m"))
+                active_data.append(row['active_users'])
+                msgs_data.append(row['total_msgs'] or 0)
+
+            # Top 10 faol foydalanuvchi (oxirgi 30 kun)
+            top_users = (
+                GroupActivity.objects
+                .filter(date__gte=start)
+                .values('user_id', 'first_name', 'username')
+                .annotate(total=models.Sum('msg_count'))
+                .order_by('-total')[:10]
+            )
+
+            extra_context = extra_context or {}
+            extra_context.update({
+                'chart_labels':      json.dumps(labels),
+                'chart_active':      json.dumps(active_data),
+                'chart_msgs':        json.dumps(msgs_data),
+                'top_users':         list(top_users),
+                'stats_title':       'Guruh faolligi â Oxirgi 30 kun',
+            })
+            return super().changelist_view(request, extra_context=extra_context)
 
 
 if not admin.site.is_registered(GroupRule):
@@ -686,7 +865,7 @@ if not admin.site.is_registered(GroupRule):
                 'fields': ('title', 'text', 'is_active'),
                 'description': (
                     '<p style="color:#ffd700; font-size:13px;">'
-                    '📜 Bu yerda yozgan qoidalaringiz guruhga yangi kirgan har bir odamga '
+                    'ð Bu yerda yozgan qoidalaringiz guruhga yangi kirgan har bir odamga '
                     'lichkasiga avtomatik yuboriladi. HTML formatida yozishingiz mumkin.'
                     '</p>'
                 )
@@ -707,7 +886,7 @@ if not admin.site.is_registered(GroupMessage):
                 'fields': ('text', 'photo_url', 'pin_message'),
                 'description': (
                     '<p style="color:#ffd700; font-size:13px;">'
-                    '📣 Xabar yozing va "Guruhga yuborish" tugmasini bosing. '
+                    'ð£ Xabar yozing va "Guruhga yuborish" tugmasini bosing. '
                     'Xabar to\'g\'ridan-to\'g\'ri guruhga yuboriladi.'
                     '</p>'
                 )
@@ -733,10 +912,10 @@ if not admin.site.is_registered(GroupMessage):
                     except Exception as e:
                         logger.error(f"GroupMessage thread xatolik: {e}")
                 threading.Thread(target=run, daemon=True).start()
-            self.message_user(request, "✅ Xabar guruhga yuborilmoqda!")
-        send_to_group_action.short_description = "📣 Tanlangan xabarlarni guruhga yuborish"
+            self.message_user(request, "â Xabar guruhga yuborilmoqda!")
+        send_to_group_action.short_description = "ð£ Tanlangan xabarlarni guruhga yuborish"
 
-admin.site.site_header = "⚜ Mafia Habibiti"
+admin.site.site_header = "â Mafia Habibiti"
 admin.site.index_title = "Boshqaruv paneli"
 
 # =====================================================================
@@ -752,7 +931,7 @@ def fix_missing_tables():
     # 1. Django standart jadvallarini yaratish (auth, sessions va h.k.)
     try:
         call_command('migrate', interactive=False)
-        logger.info("✅ Migratsiyalar muvaffaqiyatli bajarildi!")
+        logger.info("â Migratsiyalar muvaffaqiyatli bajarildi!")
     except Exception as e:
         logger.error(f"Migrate xatolik: {e}")
 
@@ -809,7 +988,7 @@ def fix_missing_tables():
     try:
         if not User.objects.filter(username='admin').exists():
             User.objects.create_superuser('admin', 'admin@example.com', 'admin777')
-            logger.info("🔐 Admin foydalanuvchisi yaratildi. Login: admin | Parol: admin777")
+            logger.info("ð Admin foydalanuvchisi yaratildi. Login: admin | Parol: admin777")
     except Exception as e:
         logger.error(f"Admin yaratishda xatolik: {e}")
 
@@ -817,13 +996,13 @@ def fix_missing_tables():
 # 7. URL SOZLAMALARI
 # =====================================================================
 from django.urls import path
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 
 def home_view(request):
     return HttpResponse("""
     <html>
     <head>
-        <title>⚜ Mafia Habibiti</title>
+        <title>â Mafia Habibiti</title>
         <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Rajdhani:wght@500&display=swap" rel="stylesheet">
         <style>
             body { background:#080a0f; display:flex; justify-content:center; align-items:center; height:100vh; margin:0; font-family:'Rajdhani',sans-serif; }
@@ -835,7 +1014,7 @@ def home_view(request):
     </head>
     <body>
         <div class="box">
-            <h2>⚜ Mafia Habibiti</h2>
+            <h2>â Mafia Habibiti</h2>
             <p>Tizim muvaffaqiyatli ishga tushdi</p>
             <a href="/admin/">Admin panelga kirish</a>
         </div>
@@ -843,9 +1022,56 @@ def home_view(request):
     </html>
     """)
 
+
+def stats_api_view(request):
+    """API: real-time statistika JSON formatida."""
+    from datetime import date, timedelta
+    from django.db.models import Sum as DjSum
+
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Unauthorized'}, status=401)
+
+    today = date.today()
+    week_start = today - timedelta(days=6)
+    month_start = today - timedelta(days=29)
+
+    def get_period_stats(start):
+        qs = DailyStats.objects.filter(date__gte=start)
+        return {
+            'warns':      qs.aggregate(t=DjSum('warns_given'))['t'] or 0,
+            'bans':       qs.aggregate(t=DjSum('bans_given'))['t'] or 0,
+            'links':      qs.aggregate(t=DjSum('links_given'))['t'] or 0,
+            'members':    qs.aggregate(t=DjSum('new_members'))['t'] or 0,
+            'violations': qs.aggregate(t=DjSum('admin_violations'))['t'] or 0,
+            'messages':   qs.aggregate(t=DjSum('messages_count'))['t'] or 0,
+        }
+
+    today_stats = DailyStats.objects.filter(date=today).first()
+
+    data = {
+        'today': {
+            'warns':      getattr(today_stats, 'warns_given', 0),
+            'bans':       getattr(today_stats, 'bans_given', 0),
+            'links':      getattr(today_stats, 'links_given', 0),
+            'members':    getattr(today_stats, 'new_members', 0),
+            'violations': getattr(today_stats, 'admin_violations', 0),
+            'messages':   getattr(today_stats, 'messages_count', 0),
+        },
+        'weekly':  get_period_stats(week_start),
+        'monthly': get_period_stats(month_start),
+        'total': {
+            'users': TelegramUser.objects.count(),
+            'bans':  BannedUser.objects.count(),
+            'warns': UserWarning.objects.aggregate(t=DjSum('count'))['t'] or 0,
+        }
+    }
+    return JsonResponse(data)
+
+
 urlpatterns = [
     path('', home_view),
     path('admin/', admin.site.urls),
+    path('api/stats/', stats_api_view),
 ]
 
 # =====================================================================
@@ -1022,6 +1248,12 @@ def increment_link_stat():
         BotStats.objects.filter(pk=1).update(
             total_links_given=models.F('total_links_given') + 1
         )
+        from datetime import date
+        today = date.today()
+        DailyStats.objects.get_or_create(date=today)
+        DailyStats.objects.filter(date=today).update(
+            links_given=models.F('links_given') + 1
+        )
     except Exception:
         pass
 
@@ -1045,6 +1277,81 @@ def increment_blocked_stat():
         BotStats.objects.get_or_create(pk=1)
         BotStats.objects.filter(pk=1).update(
             total_blocked=models.F('total_blocked') + 1
+        )
+        # Kunlik statistikaga ham qo'shamiz
+        from datetime import date
+        today = date.today()
+        DailyStats.objects.get_or_create(date=today)
+        DailyStats.objects.filter(date=today).update(
+            bans_given=models.F('bans_given') + 1
+        )
+    except Exception:
+        pass
+
+
+@sync_to_async
+def increment_daily_warn():
+    """Warn berilganda kunlik statistikani yangilaydi."""
+    try:
+        from datetime import date
+        today = date.today()
+        DailyStats.objects.get_or_create(date=today)
+        DailyStats.objects.filter(date=today).update(
+            warns_given=models.F('warns_given') + 1
+        )
+    except Exception:
+        pass
+
+
+@sync_to_async
+def increment_daily_admin_violation():
+    """Admin qoida buzganda kunlik statistikani yangilaydi."""
+    try:
+        from datetime import date
+        today = date.today()
+        DailyStats.objects.get_or_create(date=today)
+        DailyStats.objects.filter(date=today).update(
+            admin_violations=models.F('admin_violations') + 1
+        )
+    except Exception:
+        pass
+
+
+@sync_to_async
+def increment_daily_new_member():
+    """Yangi a'zo qo'shilganda kunlik statistikani yangilaydi."""
+    try:
+        from datetime import date
+        today = date.today()
+        DailyStats.objects.get_or_create(date=today)
+        DailyStats.objects.filter(date=today).update(
+            new_members=models.F('new_members') + 1
+        )
+    except Exception:
+        pass
+
+
+@sync_to_async
+def record_group_message(user_id: int, first_name: str, username: str):
+    """Guruhda xabar yozilganda faollikni qayd etadi."""
+    try:
+        from datetime import date
+        today = date.today()
+        obj, created = GroupActivity.objects.get_or_create(
+            user_id=user_id,
+            date=today,
+            defaults={'first_name': first_name, 'username': username, 'msg_count': 1}
+        )
+        if not created:
+            GroupActivity.objects.filter(user_id=user_id, date=today).update(
+                msg_count=models.F('msg_count') + 1,
+                first_name=first_name,
+                username=username,
+            )
+        # Kunlik xabarlar sonini ham oshiramiz
+        DailyStats.objects.get_or_create(date=today)
+        DailyStats.objects.filter(date=today).update(
+            messages_count=models.F('messages_count') + 1
         )
     except Exception:
         pass
@@ -1106,10 +1413,10 @@ async def check_bot_permission(chat_id: int, permission: str) -> bool:
     """Bot berilgan huquqqa ega yoki yo'qligini tekshiradi.
 
     permission qiymatlari:
-      'can_promote_members'  — admin qilish/olib tashlash
-      'can_restrict_members' — ban / mute
-      'can_delete_messages'  — xabar o'chirish
-      'can_pin_messages'     — pin qilish
+      'can_promote_members'  â admin qilish/olib tashlash
+      'can_restrict_members' â ban / mute
+      'can_delete_messages'  â xabar o'chirish
+      'can_pin_messages'     â pin qilish
     """
     try:
         me = await bot.get_me()
@@ -1129,16 +1436,16 @@ async def send_private(user_id: int, text: str, reply_markup=None):
         logger.error(f"Shaxsiy xabar yuborib bo'lmadi: {e}")
 
 async def send_log(text: str, user_id: int = None, unblock_button: bool = False, admin_name: str = None):
-    """Log kanalga xabar yuboradi. admin_name — kimligini ko'rsatadi."""
+    """Log kanalga xabar yuboradi. admin_name â kimligini ko'rsatadi."""
     if not LOG_CHAT_ID:
         return
     markup = None
     if unblock_button and user_id:
         markup = InlineKeyboardMarkup(inline_keyboard=[[
-            InlineKeyboardButton(text="✅ Blokdan chiqarish", callback_data=f"unblock_{user_id}")
+            InlineKeyboardButton(text="â Blokdan chiqarish", callback_data=f"unblock_{user_id}")
         ]])
     if admin_name:
-        text = text + f"\n👮 <b>Bajardi:</b> {admin_name}"
+        text = text + f"\nð® <b>Bajardi:</b> {admin_name}"
     # log_bot mavjud bo'lsa uni ishlatamiz, aks holda asosiy botni
     _sender = log_bot if log_bot else bot
     try:
@@ -1166,7 +1473,7 @@ def analyze_image_with_openai(file_bytes: bytes) -> bool:
         logger.error(f"OpenAI xatolik: {e}")
         return False
 
-# 🚀 ASYNCHRONOUS IMAGE DOWNLOADER (Botni muzlatib qo'ymaydi)
+# ð ASYNCHRONOUS IMAGE DOWNLOADER (Botni muzlatib qo'ymaydi)
 async def get_image_bytes(file_id: str) -> bytes | None:
     try:
         file = await bot.get_file(file_id)
@@ -1250,9 +1557,10 @@ async def handle_admin_violation(message: types.Message, reason: str):
     except Exception: pass
     count = await get_admin_violation(user_id) + 1
     await set_admin_violation(user_id, count)
-    await send_private(user_id, f"⚠️ Admin qoida buzdi! {reason} ({count}/15)")
+    await increment_daily_admin_violation()
+    await send_private(user_id, f"â ï¸ Admin qoida buzdi! {reason} ({count}/15)")
     if count >= 15:
-        await send_log(f"🚨 Adminni o'chiring! ID: {user_id} 15 marta qoida buzdi.")
+        await send_log(f"ð¨ Adminni o'chiring! ID: {user_id} 15 marta qoida buzdi.")
         await set_admin_violation(user_id, 0)
 
 async def handle_user_penalty(message: types.Message, reason: str):
@@ -1265,15 +1573,16 @@ async def handle_user_penalty(message: types.Message, reason: str):
     except Exception: pass
     count = await get_warning(user_id) + 1
     await set_warning(user_id, count)
+    await increment_daily_warn()
     if count >= 3:
         try:
             await bot.ban_chat_member(chat_id=chat_id, user_id=user_id)
             await increment_blocked_stat()
-            await send_log(f"🚫 <b>BAN:</b> {message.from_user.first_name} ({reason})", user_id=user_id, unblock_button=True)
+            await send_log(f"ð« <b>BAN:</b> {message.from_user.first_name} ({reason})", user_id=user_id, unblock_button=True)
             await set_warning(user_id, 0)
         except Exception as e: logger.error(f"Ban xatolik: {e}")
     else:
-        await send_private(user_id, f"⚠️ Ogohlantirish: {count}/3. Sabab: {reason}")
+        await send_private(user_id, f"â ï¸ Ogohlantirish: {count}/3. Sabab: {reason}")
 
 # =====================================================================
 # 12. CAPTCHA MANTIG'I
@@ -1298,7 +1607,7 @@ async def captcha_timeout(user_id: int):
     await asyncio.sleep(60)
     if user_id in captcha_pending:
         del captcha_pending[user_id]
-        await send_private(user_id, "⏰ Captcha vaqti tugadi! Qayta urinib ko'ring.")
+        await send_private(user_id, "â° Captcha vaqti tugadi! Qayta urinib ko'ring.")
 
 async def send_captcha(user_id: int, user_name: str):
     img_bytes, captcha_code = create_image_captcha()
@@ -1309,18 +1618,18 @@ async def send_captcha(user_id: int, user_name: str):
     try:
         captcha_file = io.BytesIO(img_bytes)
         captcha_file.name = "captcha.png"
-        await bot.send_photo(user_id, captcha_file, caption=f"Salom, {user_name}! 👋\n🤖 Rasm ichidagi kodni yozib yuboring!\n⏳ Vaqt: 60 soniya.")
+        await bot.send_photo(user_id, captcha_file, caption=f"Salom, {user_name}! ð\nð¤ Rasm ichidagi kodni yozib yuboring!\nâ³ Vaqt: 60 soniya.")
     except Exception as e: logger.error(f"Captcha yuborishda xatolik: {e}")
 
 # =====================================================================
 # 13. AIOGRAM HANDLERS
 # =====================================================================
 
-# ─────────────────────────────────────────────────────────────────────
+# âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 @dp.message(F.text == "/status")
 async def cmd_status(message: types.Message):
-    """Bot funksiyalari holati — faqat bot adminlari ko'ra oladi."""
+    """Bot funksiyalari holati â faqat bot adminlari ko'ra oladi."""
     user_id = message.from_user.id
 
     # Faqat bot admini yoki guruh creator/admin ko'ra oladi
@@ -1332,19 +1641,19 @@ async def cmd_status(message: types.Message):
 
     status = await get_bot_settings_status()
 
-    def icon(val): return "✅ Yoqiq" if val else "❌ O'chiq"
+    def icon(val): return "â Yoqiq" if val else "â O'chiq"
 
     text = (
-        "⚙️ <b>Bot Funksiyalari Holati</b>\n"
-        "━━━━━━━━━━━━━━━━━━━━\n"
-        f"🤖 <b>Kaptcha tekshiruvi:</b>    {icon(status['captcha'])}\n"
-        f"🔗 <b>Havola olish (link):</b>   {icon(status['link'])}\n"
-        f"🚪 <b>Ariza qabul qilish:</b>    {icon(status['join_request'])}\n"
-        f"📛 <b>Start tekshiruvi:</b>      {icon(status['subscription'])}\n"
-        f"👮 <b>Admin qoidalari:</b>       {icon(status['admin_rules'])}\n"
-        "━━━━━━━━━━━━━━━━━━━━\n"
-        "🎛 Tez boshqarish uchun: /panel\n"
-        "🛠 To'liq sozlamalar: <b>Admin panel → ⚙ Bot Sozlamalari</b>"
+        "âï¸ <b>Bot Funksiyalari Holati</b>\n"
+        "ââââââââââââââââââââ\n"
+        f"ð¤ <b>Kaptcha tekshiruvi:</b>    {icon(status['captcha'])}\n"
+        f"ð <b>Havola olish (link):</b>   {icon(status['link'])}\n"
+        f"ðª <b>Ariza qabul qilish:</b>    {icon(status['join_request'])}\n"
+        f"ð <b>Start tekshiruvi:</b>      {icon(status['subscription'])}\n"
+        f"ð® <b>Admin qoidalari:</b>       {icon(status['admin_rules'])}\n"
+        "ââââââââââââââââââââ\n"
+        "ð Tez boshqarish uchun: /panel\n"
+        "ð  To'liq sozlamalar: <b>Admin panel â â Bot Sozlamalari</b>"
     )
     await message.answer(text, parse_mode="HTML")
 
@@ -1356,15 +1665,15 @@ async def cmd_start(message: types.Message):
     
     if message.chat.type == "private":
         markup = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🔗 Havola olish",           callback_data="get_link")],
-            [InlineKeyboardButton(text="👨‍💼 Admin bilan bog'lanish", callback_data="contact_admin")],
+            [InlineKeyboardButton(text="ð Havola olish",           callback_data="get_link")],
+            [InlineKeyboardButton(text="ð¨âð¼ Admin bilan bog'lanish", callback_data="contact_admin")],
         ])
-        await message.answer("👋 Salom! Quyidagi tugmalardan birini tanlang:", reply_markup=markup)
+        await message.answer("ð Salom! Quyidagi tugmalardan birini tanlang:", reply_markup=markup)
 
 @dp.callback_query(F.data == "contact_admin")
 async def contact_admin_callback(callback: CallbackQuery):
     waiting_support.add(callback.from_user.id)
-    await callback.message.answer("💬 Savolingizni yozing, admin javob beradi!")
+    await callback.message.answer("ð¬ Savolingizni yozing, admin javob beradi!")
     try: await callback.answer()
     except Exception: pass
 
@@ -1376,43 +1685,43 @@ async def handle_private_message(message: types.Message):
     # KAPTCHA TEKSHIRUVI (BUG FIX: avval bu ignore qilingan edi)
     if user_id in captcha_pending:
         if not message.text:
-            await message.answer("⚠️ Iltimos, kaptcha kodini <b>matn</b> sifatida yuboring.", parse_mode="HTML")
+            await message.answer("â ï¸ Iltimos, kaptcha kodini <b>matn</b> sifatida yuboring.", parse_mode="HTML")
             return
         expected = captcha_pending[user_id]["code"]
         task      = captcha_pending[user_id]["task"]
 
         if message.text.strip().upper() == expected:
-            # ✅ To'g'ri javob
+            # â To'g'ri javob
             task.cancel()
             del captcha_pending[user_id]
             try:
                 await bot.approve_chat_join_request(MAIN_CHAT_ID, user_id)
                 await message.answer(
-                    "✅ <b>Kaptcha muvaffaqiyatli o'tdi!</b>\n"
-                    "🎉 Guruhga xush kelibsiz!",
+                    "â <b>Kaptcha muvaffaqiyatli o'tdi!</b>\n"
+                    "ð Guruhga xush kelibsiz!",
                     parse_mode="HTML"
                 )
                 await increment_captcha_stat()
             except Exception as e:
                 logger.error(f"Join request qabul xatolik: {e}")
-                await message.answer("❌ Qo'shishda xatolik yuz berdi. Admin bilan bog'laning.")
+                await message.answer("â Qo'shishda xatolik yuz berdi. Admin bilan bog'laning.")
         else:
-            # ❌ Noto'g'ri javob
+            # â Noto'g'ri javob
             await message.answer(
-                "❌ <b>Noto'g'ri kod!</b> Qayta urinib ko'ring.\n"
-                "⚠️ Kaptcha rasmiga diqqat bilan qarang.",
+                "â <b>Noto'g'ri kod!</b> Qayta urinib ko'ring.\n"
+                "â ï¸ Kaptcha rasmiga diqqat bilan qarang.",
                 parse_mode="HTML"
             )
         return
 
     if user_id in waiting_support or user_id in user_to_support:
         waiting_support.discard(user_id)
-        header = f"💬 <b>Foydalanuvchi xabari</b>\n👤 Ism: {message.from_user.first_name}\n🆔 ID: <code>{user_id}</code>\n{'—' * 20}\n"
+        header = f"ð¬ <b>Foydalanuvchi xabari</b>\nð¤ Ism: {message.from_user.first_name}\nð ID: <code>{user_id}</code>\n{'â' * 20}\n"
         try:
             sent = await bot.send_message(SUPPORT_CHAT_ID, header + (message.text or "[Media]"), parse_mode="HTML")
             user_to_support[user_id] = sent.message_id
             support_to_user[sent.message_id] = user_id
-            await message.answer("✅ Xabaringiz adminga yuborildi!")
+            await message.answer("â Xabaringiz adminga yuborildi!")
         except Exception as e: logger.error(f"Support xatolik: {e}")
 
 @dp.message(F.chat.id == SUPPORT_CHAT_ID)
@@ -1422,10 +1731,10 @@ async def handle_support_reply(message: types.Message):
     if replied_id not in support_to_user: return
     target_user_id = support_to_user[replied_id]
     try:
-        await bot.send_message(target_user_id, f"👮 <b>Admin</b> javob berdi:\n\n{message.text or '[Media]'}", parse_mode="HTML")
+        await bot.send_message(target_user_id, f"ð® <b>Admin</b> javob berdi:\n\n{message.text or '[Media]'}", parse_mode="HTML")
         user_to_support[target_user_id] = message.message_id
         support_to_user[message.message_id] = target_user_id
-    except Exception as e: await message.reply(f"❌ Xabar yuborilmadi: {e}")
+    except Exception as e: await message.reply(f"â Xabar yuborilmadi: {e}")
 
 @dp.callback_query(F.data == "get_link")
 async def get_link_callback(callback: CallbackQuery):
@@ -1435,7 +1744,7 @@ async def get_link_callback(callback: CallbackQuery):
     link_active = await is_link_enabled_in_db()
     if not link_active:
         await callback.answer(
-            "🚫 Havola olish hozircha o'chirilgan.\n"
+            "ð« Havola olish hozircha o'chirilgan.\n"
             "Admin bilan bog'laning va link oling.",
             show_alert=True
         )
@@ -1443,14 +1752,14 @@ async def get_link_callback(callback: CallbackQuery):
 
     existing_data = await get_user_link(user_id)
     if existing_data:
-        await callback.answer("⚠️ Havola berilgan!", show_alert=True)
+        await callback.answer("â ï¸ Havola berilgan!", show_alert=True)
         return
     try:
         invite = await bot.create_chat_invite_link(chat_id=MAIN_CHAT_ID, member_limit=1)
-        log_msg = await bot.send_message(LOG_CHAT_ID, f"🔗 <b>Havola olindi</b>\n👤 {callback.from_user.first_name}\n🆔 <code>{user_id}</code>\n🌐 {invite.invite_link}", parse_mode="HTML", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="❌ Bekor qilish", callback_data=f"cancel_link_{user_id}")]]))
+        log_msg = await bot.send_message(LOG_CHAT_ID, f"ð <b>Havola olindi</b>\nð¤ {callback.from_user.first_name}\nð <code>{user_id}</code>\nð {invite.invite_link}", parse_mode="HTML", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="â Bekor qilish", callback_data=f"cancel_link_{user_id}")]]))
         await set_user_link(user_id, invite.invite_link, log_msg.message_id)
         await increment_link_stat()
-        await callback.message.answer(f"🔗 Havolangiz:\n\n{invite.invite_link}")
+        await callback.message.answer(f"ð Havolangiz:\n\n{invite.invite_link}")
         await callback.answer()
     except Exception as e: logger.error(f"Link xatolik: {e}")
 
@@ -1462,15 +1771,15 @@ async def cancel_link_callback(callback: CallbackQuery):
         try: await bot.revoke_chat_invite_link(chat_id=MAIN_CHAT_ID, invite_link=link_data["link"])
         except Exception: pass
         await delete_user_link(user_id)
-        await callback.answer("✅ Havola o'chirildi.")
-    try: await callback.message.edit_reply_markup(reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="✅ O'chirildi", callback_data="done")]]))
+        await callback.answer("â Havola o'chirildi.")
+    try: await callback.message.edit_reply_markup(reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="â O'chirildi", callback_data="done")]]))
     except Exception: pass
 
 @dp.callback_query(F.data.startswith("unblock_"))
 async def unblock_user(callback: CallbackQuery):
     user_id = int(callback.data.split("_")[1])
     try:
-        # only_if_banned=False — guruhda bo'lmagan / left bo'lgan userlarni ham unban qiladi
+        # only_if_banned=False â guruhda bo'lmagan / left bo'lgan userlarni ham unban qiladi
         try:
             await bot.unban_chat_member(chat_id=MAIN_CHAT_ID, user_id=user_id, only_if_banned=False)
         except Exception as ue:
@@ -1481,19 +1790,19 @@ async def unblock_user(callback: CallbackQuery):
             invite = await bot.create_chat_invite_link(chat_id=MAIN_CHAT_ID, member_limit=1)
             link = invite.invite_link
             await set_invite_link(user_id, link)
-        await send_private(user_id, f"✅ Blokdan chiqdingiz. Havola:\n\n{link}")
+        await send_private(user_id, f"â Blokdan chiqdingiz. Havola:\n\n{link}")
         try:
             await callback.message.edit_reply_markup(
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
-                    InlineKeyboardButton(text="✅ Blokdan chiqarildi", callback_data="done")
+                    InlineKeyboardButton(text="â Blokdan chiqarildi", callback_data="done")
                 ]])
             )
         except Exception:
             pass
-        await callback.answer("✅ Bajarildi")
+        await callback.answer("â Bajarildi")
     except Exception as e:
         logger.error(f"Unblock xatolik: {e}")
-        await callback.answer(f"❌ Xatolik: {e}", show_alert=True)
+        await callback.answer(f"â Xatolik: {e}", show_alert=True)
 
 async def check_subscription(user_id: int) -> bool:
     """Foydalanuvchi botga /start bosganmi? True = start bosgan yoki tekshiruv o'chirilgan."""
@@ -1508,9 +1817,15 @@ async def check_text(message: types.Message):
     # Admin xabarlarini tekshirma (agar admin_rules o'chirilgan bo'lsa)
     if await is_admin(MAIN_CHAT_ID, message.from_user.id):
         if not await is_admin_rules_active_in_db():
+            # Baribir faollikni qayd et
+            await record_group_message(
+                message.from_user.id,
+                message.from_user.first_name or "",
+                message.from_user.username or ""
+            )
             return
 
-    # Bot start tekshiruvi — /start bosmagan bo'lsa yozishni chekla
+    # Bot start tekshiruvi â /start bosmagan bo'lsa yozishni chekla
     if not await check_subscription(message.from_user.id):
         try:
             await message.delete()
@@ -1519,11 +1834,11 @@ async def check_text(message: types.Message):
         bot_info = await bot.get_me()
         bot_link = f"https://t.me/{bot_info.username}"
         kb = InlineKeyboardMarkup(inline_keyboard=[[
-            InlineKeyboardButton(text="🤖 Botga o'tish", url=bot_link),
+            InlineKeyboardButton(text="ð¤ Botga o'tish", url=bot_link),
         ]])
         sent = await bot.send_message(
             message.chat.id,
-            f"⚠️ <b>{message.from_user.first_name}</b>, guruhda yozish uchun\n"
+            f"â ï¸ <b>{message.from_user.first_name}</b>, guruhda yozish uchun\n"
             f"avval botga <b>/start</b> bosing!",
             parse_mode="HTML",
             reply_markup=kb
@@ -1536,6 +1851,13 @@ async def check_text(message: types.Message):
             pass
         return
 
+    # Faollikni qayd etamiz
+    await record_group_message(
+        message.from_user.id,
+        message.from_user.first_name or "",
+        message.from_user.username or ""
+    )
+
     if await check_bad_words_in_db(message.text):
         await handle_user_penalty(message, reason="So'kinish")
 
@@ -1546,7 +1868,7 @@ async def check_photo(message: types.Message):
         if not await is_admin_rules_active_in_db():
             return
 
-    # Bot start tekshiruvi — /start bosmagan bo'lsa yozishni chekla
+    # Bot start tekshiruvi â /start bosmagan bo'lsa yozishni chekla
     if not await check_subscription(message.from_user.id):
         try:
             await message.delete()
@@ -1555,11 +1877,11 @@ async def check_photo(message: types.Message):
         bot_info = await bot.get_me()
         bot_link = f"https://t.me/{bot_info.username}"
         kb = InlineKeyboardMarkup(inline_keyboard=[[
-            InlineKeyboardButton(text="🤖 Botga o'tish", url=bot_link),
+            InlineKeyboardButton(text="ð¤ Botga o'tish", url=bot_link),
         ]])
         sent = await bot.send_message(
             message.chat.id,
-            f"⚠️ <b>{message.from_user.first_name}</b>, guruhda yozish uchun\n"
+            f"â ï¸ <b>{message.from_user.first_name}</b>, guruhda yozish uchun\n"
             f"avval botga <b>/start</b> bosing!",
             parse_mode="HTML",
             reply_markup=kb
@@ -1582,7 +1904,7 @@ async def check_video(message: types.Message):
         if not await is_admin_rules_active_in_db():
             return
 
-    # Bot start tekshiruvi — /start bosmagan bo'lsa yozishni chekla
+    # Bot start tekshiruvi â /start bosmagan bo'lsa yozishni chekla
     if not await check_subscription(message.from_user.id):
         try:
             await message.delete()
@@ -1591,11 +1913,11 @@ async def check_video(message: types.Message):
         bot_info = await bot.get_me()
         bot_link = f"https://t.me/{bot_info.username}"
         kb = InlineKeyboardMarkup(inline_keyboard=[[
-            InlineKeyboardButton(text="🤖 Botga o'tish", url=bot_link),
+            InlineKeyboardButton(text="ð¤ Botga o'tish", url=bot_link),
         ]])
         sent = await bot.send_message(
             message.chat.id,
-            f"⚠️ <b>{message.from_user.first_name}</b>, guruhda yozish uchun\n"
+            f"â ï¸ <b>{message.from_user.first_name}</b>, guruhda yozish uchun\n"
             f"avval botga <b>/start</b> bosing!",
             parse_mode="HTML",
             reply_markup=kb
@@ -1619,7 +1941,7 @@ async def check_animation(message: types.Message):
         if not await is_admin_rules_active_in_db():
             return
 
-    # Bot start tekshiruvi — /start bosmagan bo'lsa yozishni chekla
+    # Bot start tekshiruvi â /start bosmagan bo'lsa yozishni chekla
     if not await check_subscription(message.from_user.id):
         try:
             await message.delete()
@@ -1656,7 +1978,7 @@ async def check_sticker(message: types.Message):
         if not await is_admin_rules_active_in_db():
             return
 
-    # Bot start tekshiruvi — /start bosmagan bo'lsa yozishni chekla
+    # Bot start tekshiruvi â /start bosmagan bo'lsa yozishni chekla
     if not await check_subscription(message.from_user.id):
         try:
             await message.delete()
@@ -1685,43 +2007,43 @@ async def check_sticker(message: types.Message):
     if image_bytes and await analyze_image_async(image_bytes):
         await handle_user_penalty(message, reason="Odobsiz stiker")
 
-# ─────────────────────────────────────────────────────────────────────
+# âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 # /id komandasi moderator.py (MOD) orqali boshqariladi
 
 
-# ─────────────────────────────────────────────────────────────────────
+# âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 # PANEL YORDAMCHI FUNKSIYA
-# ─────────────────────────────────────────────────────────────────────
+# âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 async def _build_panel(user_id: int):
     """Panel matn va inline tugmalarini qaytaradi."""
     settings = await get_bot_settings_status()
     stats    = await get_full_stats()
 
-    def bi(v): return "🟢" if v else "🔴"
+    def bi(v): return "ð¢" if v else "ð´"
     def tog_btn(code, val, label):
-        icon = "✅" if val else "❌"
+        icon = "â" if val else "â"
         return InlineKeyboardButton(text=f"{icon} {label}", callback_data=f"pnl_t_{code}")
 
     text = (
-        "🎛 <b>⚜ Mafia Habibiti — Boshqaruv Paneli</b>\n"
-        "━━━━━━━━━━━━━━━━━━━━\n\n"
-        "📊 <b>Statistika:</b>\n"
-        f"👥 Foydalanuvchilar: <b>{stats['users']:,}</b>\n"
-        f"🔗 Havola oldi: <b>{stats['links']:,}</b>\n"
-        f"🤖 Kaptcha o'tdi: <b>{stats['captcha']:,}</b>\n"
-        f"🚫 Bot blok qildi: <b>{stats['blocked']:,}</b>\n"
-        f"🔒 Permanent ban: <b>{stats['bans']:,}</b>\n"
-        f"⚠️ Ogohlantirishlar: <b>{stats['users_with_warns']}</b> ta foydalanuvchi\n\n"
-        "⚙️ <b>Sozlamalar:</b>\n"
+        "ð <b>â Mafia Habibiti â Boshqaruv Paneli</b>\n"
+        "ââââââââââââââââââââ\n\n"
+        "ð <b>Statistika:</b>\n"
+        f"ð¥ Foydalanuvchilar: <b>{stats['users']:,}</b>\n"
+        f"ð Havola oldi: <b>{stats['links']:,}</b>\n"
+        f"ð¤ Kaptcha o'tdi: <b>{stats['captcha']:,}</b>\n"
+        f"ð« Bot blok qildi: <b>{stats['blocked']:,}</b>\n"
+        f"ð Permanent ban: <b>{stats['bans']:,}</b>\n"
+        f"â ï¸ Ogohlantirishlar: <b>{stats['users_with_warns']}</b> ta foydalanuvchi\n\n"
+        "âï¸ <b>Sozlamalar:</b>\n"
         f"{bi(settings['captcha'])} Kaptcha tekshiruvi\n"
         f"{bi(settings['link'])} Havola olish\n"
         f"{bi(settings['join_request'])} Arizalarni qabul qilish\n"
         f"{bi(settings['subscription'])} /start tekshiruvi\n"
         f"{bi(settings['admin_rules'])} Adminlarga ham qoidalar\n"
-        "━━━━━━━━━━━━━━━━━━━━"
+        "ââââââââââââââââââââ"
     )
     markup = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🔄 Yangilash", callback_data="pnl_r")],
+        [InlineKeyboardButton(text="ð Yangilash", callback_data="pnl_r")],
         [
             tog_btn("cap", settings['captcha'],      "Kaptcha"),
             tog_btn("lnk", settings['link'],         "Havola"),
@@ -1732,23 +2054,23 @@ async def _build_panel(user_id: int):
         ],
         [tog_btn("adm", settings['admin_rules'], "Admin qoidalari")],
         [
-            InlineKeyboardButton(text="👑 Adminlar",        callback_data="pnl_adm"),
-            InlineKeyboardButton(text="🚫 Banlar",          callback_data="pnl_ban"),
+            InlineKeyboardButton(text="ð Adminlar",        callback_data="pnl_adm"),
+            InlineKeyboardButton(text="ð« Banlar",          callback_data="pnl_ban"),
         ],
         [
-            InlineKeyboardButton(text="⚠️ Ogohlantirishlar", callback_data="pnl_wrn"),
-            InlineKeyboardButton(text="📜 Qoidalar",         callback_data="pnl_rul"),
+            InlineKeyboardButton(text="â ï¸ Ogohlantirishlar", callback_data="pnl_wrn"),
+            InlineKeyboardButton(text="ð Qoidalar",         callback_data="pnl_rul"),
         ],
     ])
     return text, markup
 
 
-# ─────────────────────────────────────────────────────────────────────
-# /panel — Telegram admin paneli
-# ─────────────────────────────────────────────────────────────────────
+# âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+# /panel â Telegram admin paneli
+# âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 @dp.message(F.text == "/panel")
 async def cmd_panel(message: types.Message):
-    """Bot boshqaruv paneli — bot adminlari va guruh adminlari uchun.
+    """Bot boshqaruv paneli â bot adminlari va guruh adminlari uchun.
     Guruhda ham, private chatda ham ishlaydi.
     """
     user_id = message.from_user.id
@@ -1763,9 +2085,9 @@ async def cmd_panel(message: types.Message):
     await message.answer(text, parse_mode="HTML", reply_markup=markup)
 
 
-# ─────────────────────────────────────────────────────────────────────
+# âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 # PANEL CALLBACKLARI
-# ─────────────────────────────────────────────────────────────────────
+# âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 _FIELD_MAP = {
     "cap": "is_captcha_active",
     "lnk": "is_link_active",
@@ -1782,25 +2104,25 @@ async def pnl_callback_handler(callback: CallbackQuery):
     is_grpadmin = await is_admin(MAIN_CHAT_ID, user_id)
 
     if not (is_gadmin or is_grpadmin):
-        return await callback.answer("❌ Ruxsat yo'q!", show_alert=True)
+        return await callback.answer("â Ruxsat yo'q!", show_alert=True)
 
     action = callback.data[4:]  # "pnl_" dan keyingisi
 
-    # ── Yangilash ─────────────────────────────────────────────────────
+    # ââ Yangilash âââââââââââââââââââââââââââââââââââââââââââââââââââââ
     if action == "r":
         text, markup = await _build_panel(user_id)
         try:
             await callback.message.edit_text(text, parse_mode="HTML", reply_markup=markup)
         except Exception:
             pass
-        await callback.answer("✅ Yangilandi")
+        await callback.answer("â Yangilandi")
 
-    # ── Sozlamalarni o'zgartirish ─────────────────────────────────────
+    # ââ Sozlamalarni o'zgartirish âââââââââââââââââââââââââââââââââââââ
     elif action.startswith("t_"):
         code = action[2:]
         field = _FIELD_MAP.get(code)
         if not field:
-            return await callback.answer("❓ Noma'lum sozlama", show_alert=True)
+            return await callback.answer("â Noma'lum sozlama", show_alert=True)
         new_val = await toggle_bot_setting(field)
         label_map = {
             "cap": "Kaptcha",   "lnk": "Havola",
@@ -1809,7 +2131,7 @@ async def pnl_callback_handler(callback: CallbackQuery):
         }
         lbl = label_map.get(code, code)
         await callback.answer(
-            f"{'✅ Yoqildi' if new_val else '❌ O\'chirildi'}: {lbl}",
+            f"{'â Yoqildi' if new_val else 'â O\'chirildi'}: {lbl}",
             show_alert=True
         )
         # Panelni yangilash
@@ -1819,26 +2141,26 @@ async def pnl_callback_handler(callback: CallbackQuery):
         except Exception:
             pass
 
-    # ── Adminlar ro'yxati ─────────────────────────────────────────────
+    # ââ Adminlar ro'yxati âââââââââââââââââââââââââââââââââââââââââââââ
     elif action == "adm":
         try:
             members = await bot.get_chat_administrators(MAIN_CHAT_ID)
-            lines = ["👑 <b>Guruh adminlari:</b>\n"]
+            lines = ["ð <b>Guruh adminlari:</b>\n"]
             for m in members:
                 u = m.user
                 if u.is_bot:
                     continue
                 un = f" @{u.username}" if u.username else ""
-                role = "👑 Egasi" if m.status == "creator" else "⭐ Admin"
-                lines.append(f"{role} <b>{u.first_name}</b>{un}\n🆔 <code>{u.id}</code>")
+                role = "ð Egasi" if m.status == "creator" else "â­ Admin"
+                lines.append(f"{role} <b>{u.first_name}</b>{un}\nð <code>{u.id}</code>")
             await callback.message.answer(
                 "\n".join(lines), parse_mode="HTML"
             )
             await callback.answer()
         except Exception as e:
-            await callback.answer(f"❌ Xatolik: {e}", show_alert=True)
+            await callback.answer(f"â Xatolik: {e}", show_alert=True)
 
-    # ── Banlar ro'yxati ───────────────────────────────────────────────
+    # ââ Banlar ro'yxati âââââââââââââââââââââââââââââââââââââââââââââââ
     elif action == "ban":
         @sync_to_async
         def _bans():
@@ -1847,51 +2169,51 @@ async def pnl_callback_handler(callback: CallbackQuery):
             )[:20])
         bans = await _bans()
         if not bans:
-            return await callback.answer("✅ Permanent ban ro'yxati bo'sh.", show_alert=True)
-        lines = [f"🚫 <b>Permanent Banlar</b> (oxirgi {len(bans)} ta):\n"]
+            return await callback.answer("â Permanent ban ro'yxati bo'sh.", show_alert=True)
+        lines = [f"ð« <b>Permanent Banlar</b> (oxirgi {len(bans)} ta):\n"]
         for b in bans:
             un = f" @{b['username']}" if b['username'] else ""
-            reason = b['reason'] or "—"
+            reason = b['reason'] or "â"
             lines.append(
-                f"• <b>{b['first_name'] or 'Noma\'lum'}</b>{un}\n"
-                f"  🆔 <code>{b['user_id']}</code> | {reason}"
+                f"â¢ <b>{b['first_name'] or 'Noma\'lum'}</b>{un}\n"
+                f"  ð <code>{b['user_id']}</code> | {reason}"
             )
         await callback.message.answer("\n".join(lines), parse_mode="HTML")
         await callback.answer()
 
-    # ── Ogohlantirishlar ──────────────────────────────────────────────
+    # ââ Ogohlantirishlar ââââââââââââââââââââââââââââââââââââââââââââââ
     elif action == "wrn":
         warnings = await get_all_warnings()
         if not warnings:
-            return await callback.answer("✅ Hech kim ogohlantirish olmagan.", show_alert=True)
-        lines = ["⚠️ <b>Ogohlantirish jadvali:</b>\n"]
+            return await callback.answer("â Hech kim ogohlantirish olmagan.", show_alert=True)
+        lines = ["â ï¸ <b>Ogohlantirish jadvali:</b>\n"]
         for i, w in enumerate(warnings[:15], 1):
             un = f" @{w['username']}" if w['username'] else ""
             lines.append(
                 f"{i}. <b>{w['first_name']}</b>{un}\n"
-                f"   🆔 <code>{w['user_id']}</code> — <b>{w['count']}/3</b>"
+                f"   ð <code>{w['user_id']}</code> â <b>{w['count']}/3</b>"
             )
         await callback.message.answer("\n".join(lines), parse_mode="HTML")
         await callback.answer()
 
-    # ── Qoidalarni guruhga yuborish ───────────────────────────────────
+    # ââ Qoidalarni guruhga yuborish âââââââââââââââââââââââââââââââââââ
     elif action == "rul":
         rules_text = await get_active_rules()
         if not rules_text:
-            return await callback.answer("❌ Faol qoidalar topilmadi. Admin panel → Guruh Qoidalaridan qo'shing.", show_alert=True)
+            return await callback.answer("â Faol qoidalar topilmadi. Admin panel â Guruh Qoidalaridan qo'shing.", show_alert=True)
         try:
-            await bot.send_message(MAIN_CHAT_ID, f"📜 <b>Guruh Qoidalari</b>\n\n{rules_text}", parse_mode="HTML")
-            await callback.answer("✅ Qoidalar guruhga yuborildi!")
+            await bot.send_message(MAIN_CHAT_ID, f"ð <b>Guruh Qoidalari</b>\n\n{rules_text}", parse_mode="HTML")
+            await callback.answer("â Qoidalar guruhga yuborildi!")
         except Exception as e:
-            await callback.answer(f"❌ Xatolik: {e}", show_alert=True)
+            await callback.answer(f"â Xatolik: {e}", show_alert=True)
 
     else:
-        await callback.answer("❓ Noma'lum amal.")
+        await callback.answer("â Noma'lum amal.")
 
 
-# ─────────────────────────────────────────────────────────────────────
-# on_my_chat_member — Bot guruhga qo'shilganda egasini admin qilish
-# ─────────────────────────────────────────────────────────────────────
+# âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+# on_my_chat_member â Bot guruhga qo'shilganda egasini admin qilish
+# âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 @dp.my_chat_member()
 async def on_my_chat_member(update: types.ChatMemberUpdated):
     """Bot guruhga qo'shilganida BotOwner jadvalidagi egasini avtomatik admin qiladi."""
@@ -1919,7 +2241,7 @@ async def on_my_chat_member(update: types.ChatMemberUpdated):
     bot_perms = {}
     try:
         me = await bot.get_me()
-        # Biroz kutamiz — Telegram API ba'zan kech yangilanadi
+        # Biroz kutamiz â Telegram API ba'zan kech yangilanadi
         await asyncio.sleep(2)
         member = await bot.get_chat_member(chat.id, me.id)
         if member.status == "administrator":
@@ -1933,7 +2255,7 @@ async def on_my_chat_member(update: types.ChatMemberUpdated):
                 'can_pin_messages':     getattr(member, 'can_pin_messages',     False) or False,
             }
         else:
-            logger.warning(f"Bot {chat.title} guruhida admin emas — egasini ham admin qilib bo'lmaydi.")
+            logger.warning(f"Bot {chat.title} guruhida admin emas â egasini ham admin qilib bo'lmaydi.")
             return
     except Exception as e:
         logger.error(f"Bot huquqlarini tekshirishda xatolik: {e}")
@@ -1944,18 +2266,18 @@ async def on_my_chat_member(update: types.ChatMemberUpdated):
             await bot.promote_chat_member(chat_id=chat.id, user_id=owner_id, **bot_perms)
             logger.info(f"Bot egasi {owner_id} '{chat.title}' guruhida admin qilindi.")
             await send_log(
-                f"👑 <b>Bot egasi avtomatik admin qilindi!</b>\n"
-                f"📌 Guruh: <b>{chat.title}</b>\n"
-                f"👤 Egasi ID: <code>{owner_id}</code>\n"
-                f"✅ Berilgan huquqlar: {', '.join(k for k, v in bot_perms.items() if v)}"
+                f"ð <b>Bot egasi avtomatik admin qilindi!</b>\n"
+                f"ð Guruh: <b>{chat.title}</b>\n"
+                f"ð¤ Egasi ID: <code>{owner_id}</code>\n"
+                f"â Berilgan huquqlar: {', '.join(k for k, v in bot_perms.items() if v)}"
             )
         except Exception as e:
             logger.error(f"Bot egasini admin qilishda xatolik (ID {owner_id}): {e}")
             await send_log(
-                f"⚠️ <b>Bot egasini admin qilishda xatolik!</b>\n"
-                f"📌 Guruh: {chat.title}\n"
-                f"👤 Egasi ID: <code>{owner_id}</code>\n"
-                f"❌ Xato: {e}"
+                f"â ï¸ <b>Bot egasini admin qilishda xatolik!</b>\n"
+                f"ð Guruh: {chat.title}\n"
+                f"ð¤ Egasi ID: <code>{owner_id}</code>\n"
+                f"â Xato: {e}"
             )
 
 
@@ -1975,19 +2297,19 @@ async def on_join_request(update: types.ChatJoinRequest):
         join_active    = await is_join_request_enabled_in_db()
         captcha_active = await is_captcha_enabled_in_db()
 
-        # Agar ikkisi ham o'chiq bo'lsa — bot zayafkaga UMUMAN tegmasin
+        # Agar ikkisi ham o'chiq bo'lsa â bot zayafkaga UMUMAN tegmasin
         if not join_active and not captcha_active:
             return
 
-        # Kaptcha yoqiq bo'lsa — kaptcha yuboramiz (join_active dan qat'iy nazar)
+        # Kaptcha yoqiq bo'lsa â kaptcha yuboramiz (join_active dan qat'iy nazar)
         if captcha_active:
             await send_captcha(update.from_user.id, update.from_user.first_name)
             return
 
-        # Faqat avto-qabul yoqiq, kaptcha o'chiq — to'g'ridan qabul
+        # Faqat avto-qabul yoqiq, kaptcha o'chiq â to'g'ridan qabul
         try:
             await bot.approve_chat_join_request(MAIN_CHAT_ID, update.from_user.id)
-            await send_private(update.from_user.id, "✅ Guruhga xush kelibsiz! 🎉")
+            await send_private(update.from_user.id, "â Guruhga xush kelibsiz! ð")
         except Exception as e:
             logger.error(f"To'g'ridan-to'g'ri qabul qilishda xatolik: {e}")
 
@@ -2003,57 +2325,58 @@ async def on_chat_member_update(update: types.ChatMemberUpdated):
     user       = update.new_chat_member.user
     user_id    = user.id
     user_name  = user.first_name or f"ID:{user_id}"
-    username   = f"@{user.username}" if user.username else "—"
+    username   = f"@{user.username}" if user.username else "â"
 
     # Kim ban qilganini aniqlaymiz (agar Telegram bersa)
     banned_by = None
     if update.from_user and update.from_user.id != user_id:
         banned_by = update.from_user.first_name or f"ID:{update.from_user.id}"
 
-    # ── Yangi a'zo kirdi ──────────────────────────────────────────────
+    # ââ Yangi a'zo kirdi ââââââââââââââââââââââââââââââââââââââââââââââ
     just_joined = (
         old_status in ("left", "kicked") and
         new_status in ("member", "restricted")
     )
     if just_joined:
+        await increment_daily_new_member()
         rules_text = await get_active_rules()
         if rules_text:
             greeting = (
-                f"👋 Salom, <b>{user_name}</b>!\n\n"
-                f"🎉 <b>Guruhga xush kelibsiz!</b>\n\n"
+                f"ð Salom, <b>{user_name}</b>!\n\n"
+                f"ð <b>Guruhga xush kelibsiz!</b>\n\n"
                 f"{rules_text}\n\n"
-                f"⚠️ Qoidalarga rioya qilmasangiz, ogohlantirish yoki ban beriladi."
+                f"â ï¸ Qoidalarga rioya qilmasangiz, ogohlantirish yoki ban beriladi."
             )
             await send_private(user_id, greeting)
         return
 
-    by_line = f"\n👮 <b>Kim:</b> {banned_by}" if banned_by else ""
+    by_line = f"\nð® <b>Kim:</b> {banned_by}" if banned_by else ""
 
-    # ── 1. BAN qilindi ────────────────────────────────────────────────
+    # ââ 1. BAN qilindi ââââââââââââââââââââââââââââââââââââââââââââââââ
     just_banned = (
         old_status in ("member", "administrator", "creator", "restricted", "left") and
         new_status == "kicked"
     )
     if just_banned:
         await send_log(
-            f"🚫 <b>BAN qilindi</b>\n"
-            f"👤 <b>{user_name}</b> ({username})\n"
-            f"🆔 <code>{user_id}</code>"
+            f"ð« <b>BAN qilindi</b>\n"
+            f"ð¤ <b>{user_name}</b> ({username})\n"
+            f"ð <code>{user_id}</code>"
             f"{by_line}"
         )
         logger.info(f"Ban log: {user_id} ({user_name})")
         return
 
-    # ── 2. UNBAN qilindi ──────────────────────────────────────────────
+    # ââ 2. UNBAN qilindi ââââââââââââââââââââââââââââââââââââââââââââââ
     just_unbanned = (
         old_status == "kicked" and
         new_status in ("member", "left", "restricted")
     )
     if just_unbanned:
         await send_log(
-            f"✅ <b>UNBAN qilindi</b>\n"
-            f"👤 <b>{user_name}</b> ({username})\n"
-            f"🆔 <code>{user_id}</code>"
+            f"â <b>UNBAN qilindi</b>\n"
+            f"ð¤ <b>{user_name}</b> ({username})\n"
+            f"ð <code>{user_id}</code>"
             f"{by_line}"
         )
         if await is_permanently_banned(user_id):
@@ -2061,56 +2384,56 @@ async def on_chat_member_update(update: types.ChatMemberUpdated):
                 await bot.ban_chat_member(chat_id=MAIN_CHAT_ID, user_id=user_id)
                 logger.warning(f"Hafli user {user_id} qayta ban qilindi.")
                 await send_log(
-                    f"🚨 <b>Hafli user QAYTA BAN!</b>\n"
-                    f"👤 {user_name} — <code>{user_id}</code>\n"
-                    f"⚡ Kimdir unban qildi — bot qayta ban qildi."
+                    f"ð¨ <b>Hafli user QAYTA BAN!</b>\n"
+                    f"ð¤ {user_name} â <code>{user_id}</code>\n"
+                    f"â¡ Kimdir unban qildi â bot qayta ban qildi."
                 )
             except Exception as e:
                 logger.error(f"Hafli user qayta ban xatolik: {e}")
         return
 
-    # ── 3. MUTE / UNMUTE (restricted holat o'zgardi) ──────────────────
+    # ââ 3. MUTE / UNMUTE (restricted holat o'zgardi) ââââââââââââââââââ
     if old_status in ("member", "restricted") and new_status == "restricted":
         old_can_send = getattr(update.old_chat_member, 'can_send_messages', True)
         new_can_send = getattr(update.new_chat_member, 'can_send_messages', True)
         if old_can_send and not new_can_send:
             await send_log(
-                f"🔇 <b>MUTE qilindi</b>\n"
-                f"👤 <b>{user_name}</b> ({username})\n"
-                f"🆔 <code>{user_id}</code>"
+                f"ð <b>MUTE qilindi</b>\n"
+                f"ð¤ <b>{user_name}</b> ({username})\n"
+                f"ð <code>{user_id}</code>"
                 f"{by_line}"
             )
             return
         if not old_can_send and new_can_send:
             await send_log(
-                f"🔊 <b>UNMUTE qilindi</b>\n"
-                f"👤 <b>{user_name}</b> ({username})\n"
-                f"🆔 <code>{user_id}</code>"
+                f"ð <b>UNMUTE qilindi</b>\n"
+                f"ð¤ <b>{user_name}</b> ({username})\n"
+                f"ð <code>{user_id}</code>"
                 f"{by_line}"
             )
             return
 
-    # ── 4. ADMIN qilindi ──────────────────────────────────────────────
+    # ââ 4. ADMIN qilindi ââââââââââââââââââââââââââââââââââââââââââââââ
     if old_status in ("member", "restricted", "left") and new_status == "administrator":
         await send_log(
-            f"👑 <b>ADMIN qilindi</b>\n"
-            f"👤 <b>{user_name}</b> ({username})\n"
-            f"🆔 <code>{user_id}</code>"
+            f"ð <b>ADMIN qilindi</b>\n"
+            f"ð¤ <b>{user_name}</b> ({username})\n"
+            f"ð <code>{user_id}</code>"
             f"{by_line}"
         )
         return
 
-    # ── 5. ADMIN olib tashlandi ───────────────────────────────────────
+    # ââ 5. ADMIN olib tashlandi âââââââââââââââââââââââââââââââââââââââ
     if old_status == "administrator" and new_status == "member":
         await send_log(
-            f"❌ <b>ADMIN olib tashlandi</b>\n"
-            f"👤 <b>{user_name}</b> ({username})\n"
-            f"🆔 <code>{user_id}</code>"
+            f"â <b>ADMIN olib tashlandi</b>\n"
+            f"ð¤ <b>{user_name}</b> ({username})\n"
+            f"ð <code>{user_id}</code>"
             f"{by_line}"
         )
         return
 
-    # ── 6. Hafli userni qayta ban (fallback) ──────────────────────────
+    # ââ 6. Hafli userni qayta ban (fallback) ââââââââââââââââââââââââââ
     was_banned = old_status in ("kicked", "restricted")
     now_free   = new_status in ("member", "administrator", "creator", "restricted", "left")
     if was_banned and now_free:
@@ -2119,9 +2442,9 @@ async def on_chat_member_update(update: types.ChatMemberUpdated):
                 await bot.ban_chat_member(chat_id=MAIN_CHAT_ID, user_id=user_id)
                 logger.warning(f"Hafli user {user_id} qayta ban qilindi.")
                 await send_log(
-                    f"🚨 <b>Hafli user QAYTA BAN!</b>\n"
-                    f"👤 {user_name} — <code>{user_id}</code>\n"
-                    f"⚡ Kimdir unban qildi — bot qayta ban qildi."
+                    f"ð¨ <b>Hafli user QAYTA BAN!</b>\n"
+                    f"ð¤ {user_name} â <code>{user_id}</code>\n"
+                    f"â¡ Kimdir unban qildi â bot qayta ban qildi."
                 )
             except Exception as e:
                 logger.error(f"Hafli user qayta ban xatolik: {e}")
@@ -2138,7 +2461,7 @@ async def run_django_web_server():
     asgi_app = get_asgi_application()
 
     port = int(os.getenv("PORT", 8080))
-    logger.info(f"🌍 Django {port}-portda ishga tushmoqda...")
+    logger.info(f"ð Django {port}-portda ishga tushmoqda...")
 
     config = uvicorn.Config(asgi_app, host="0.0.0.0", port=port, log_level="warning")
     server = uvicorn.Server(config)
@@ -2149,31 +2472,31 @@ async def run_django_web_server():
 # =====================================================================
 async def main():
     global _main_loop
-    logger.info("🚀 TIZIM ISHGA TUSHMOQDA...")
+    logger.info("ð TIZIM ISHGA TUSHMOQDA...")
 
     # Global event loopni saqlaymiz (BroadcastMessage.save() uchun)
     _main_loop = asyncio.get_event_loop()
 
-    # 🚀 RAILWAY ISHGA TUSHGANDA JAZZMIN STILLARINI AVTOMATIK YIG'ISH
+    # ð RAILWAY ISHGA TUSHGANDA JAZZMIN STILLARINI AVTOMATIK YIG'ISH
     from django.core.management import call_command
     await asyncio.to_thread(call_command, 'collectstatic', interactive=False)
     
     # Jadvallarni tekshirish va yaratish
     await fix_missing_tables()
     
-    logger.info("🤖 BOT VA DJANGO ADMIN TAYYOR!")
+    logger.info("ð¤ BOT VA DJANGO ADMIN TAYYOR!")
 
     # Restart xabari guruhga
     try:
         await bot.send_message(
             MAIN_CHAT_ID,
-            "⚠️ <b>Diqqat!</b> Bot yangilandi va qayta ishga tushdi. Hamma narsa avvalgidek ishlaydi! ✅",
+            "â ï¸ <b>Diqqat!</b> Bot yangilandi va qayta ishga tushdi. Hamma narsa avvalgidek ishlaydi! â",
             parse_mode="HTML"
         )
     except Exception as e:
         logger.error(f"Restart xabari xatolik: {e}")
 
-    # ── MODERATSIYA MODULI ────────────────────────────────────────────
+    # ââ MODERATSIYA MODULI ââââââââââââââââââââââââââââââââââââââââââââ
     MOD.init(
         bot             = bot,
         main_chat       = MAIN_CHAT_ID,
@@ -2187,7 +2510,7 @@ async def main():
         send_log_fn     = send_log,
     )
     MOD.register(dp)
-    logger.info("✅ Moderatsiya moduli ulandi!")
+    logger.info("â Moderatsiya moduli ulandi!")
 
     await asyncio.gather(
         dp.start_polling(bot, allowed_updates=["message", "callback_query", "chat_join_request", "chat_member", "my_chat_member"]),
