@@ -1,0 +1,313 @@
+{% extends "admin/change_list.html" %}
+{% load i18n %}
+
+{% block content %}
+
+<!-- ══════════════ STATS SUMMARY CARDS ══════════════ -->
+<div class="stats-dashboard">
+
+  <div class="stats-header">
+    <h2>📊 {{ stats_title }}</h2>
+    <span class="stats-period">Kunlik, haftalik, oylik ko'rsatkichlar</span>
+  </div>
+
+  <!-- Summary cards -->
+  <div class="stat-cards-grid">
+    <div class="stat-card stat-warn">
+      <div class="stat-icon">⚠️</div>
+      <div class="stat-value">{{ total_warns }}</div>
+      <div class="stat-label">Warnlar (30 kun)</div>
+    </div>
+    <div class="stat-card stat-ban">
+      <div class="stat-icon">🚫</div>
+      <div class="stat-value">{{ total_bans }}</div>
+      <div class="stat-label">Banlar (30 kun)</div>
+    </div>
+    <div class="stat-card stat-link">
+      <div class="stat-icon">🔗</div>
+      <div class="stat-value">{{ total_links }}</div>
+      <div class="stat-label">Havolalar (30 kun)</div>
+    </div>
+    <div class="stat-card stat-member">
+      <div class="stat-icon">👥</div>
+      <div class="stat-value">{{ total_members }}</div>
+      <div class="stat-label">Yangi a'zolar (30 kun)</div>
+    </div>
+    <div class="stat-card stat-violation">
+      <div class="stat-icon">👮</div>
+      <div class="stat-value">{{ total_violations }}</div>
+      <div class="stat-label">Admin buzishlar (30 kun)</div>
+    </div>
+  </div>
+
+  <!-- Main chart: Warns & Bans -->
+  <div class="chart-section">
+    <div class="chart-card chart-wide">
+      <div class="chart-card-header">
+        <span class="chart-title">⚠️ Warn va Ban dinamikasi</span>
+        <span class="chart-subtitle">Oxirgi 30 kun</span>
+      </div>
+      <div class="chart-body">
+        <canvas id="warnBanChart" height="80"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Second row: Links & Members -->
+  <div class="chart-section chart-two-col">
+    <div class="chart-card">
+      <div class="chart-card-header">
+        <span class="chart-title">🔗 Havolalar va Yangi a'zolar</span>
+      </div>
+      <div class="chart-body">
+        <canvas id="linksChart" height="120"></canvas>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-card-header">
+        <span class="chart-title">👮 Admin qoida buzishlari</span>
+      </div>
+      <div class="chart-body">
+        <canvas id="violationsChart" height="120"></canvas>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══════════════ DATA TABLE ══════════════ -->
+<div class="stats-table-section">
+  <div class="chart-card-header" style="padding:14px 20px; border-bottom:1px solid var(--border);">
+    <span class="chart-title">📋 Kunlik Ma'lumotlar Jadvali</span>
+  </div>
+  {{ block.super }}
+</div>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+const LABELS   = {{ chart_labels|safe }};
+const WARNS    = {{ chart_warns|safe }};
+const BANS     = {{ chart_bans|safe }};
+const LINKS    = {{ chart_links|safe }};
+const MEMBERS  = {{ chart_members|safe }};
+const VIOL     = {{ chart_violations|safe }};
+
+const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+const gridColor   = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+const tickColor   = isDark ? '#94a3b8' : '#64748b';
+const tooltipBg   = isDark ? '#1a1d27' : '#fff';
+const tooltipText = isDark ? '#e2e8f0' : '#1e293b';
+
+Chart.defaults.font.family = "'Inter', 'Segoe UI', system-ui, sans-serif";
+Chart.defaults.font.size   = 12;
+
+const commonOptions = {
+  responsive: true,
+  maintainAspectRatio: true,
+  interaction: { mode: 'index', intersect: false },
+  plugins: {
+    legend: {
+      labels: { color: tickColor, padding: 16, boxWidth: 12 }
+    },
+    tooltip: {
+      backgroundColor: tooltipBg,
+      titleColor: tooltipText,
+      bodyColor: tickColor,
+      borderColor: isDark ? '#2a2d3e' : '#e2e8f0',
+      borderWidth: 1,
+      padding: 12,
+      cornerRadius: 8,
+    }
+  },
+  scales: {
+    x: {
+      ticks: { color: tickColor, maxTicksLimit: 10 },
+      grid:  { color: gridColor }
+    },
+    y: {
+      ticks: { color: tickColor, precision: 0 },
+      grid:  { color: gridColor },
+      beginAtZero: true,
+    }
+  }
+};
+
+// ── Warn & Ban chart ─────────────────────────────────
+new Chart(document.getElementById('warnBanChart'), {
+  type: 'line',
+  data: {
+    labels: LABELS,
+    datasets: [
+      {
+        label: '⚠️ Warnlar',
+        data: WARNS,
+        borderColor: '#f59e0b',
+        backgroundColor: 'rgba(245,158,11,0.12)',
+        tension: 0.4,
+        fill: true,
+        pointRadius: 3,
+      },
+      {
+        label: '🚫 Banlar',
+        data: BANS,
+        borderColor: '#ef4444',
+        backgroundColor: 'rgba(239,68,68,0.10)',
+        tension: 0.4,
+        fill: true,
+        pointRadius: 3,
+      }
+    ]
+  },
+  options: commonOptions
+});
+
+// ── Links & Members chart ─────────────────────────────
+new Chart(document.getElementById('linksChart'), {
+  type: 'bar',
+  data: {
+    labels: LABELS,
+    datasets: [
+      {
+        label: '🔗 Havolalar',
+        data: LINKS,
+        backgroundColor: 'rgba(99,102,241,0.75)',
+        borderRadius: 4,
+      },
+      {
+        label: '👥 Yangi a\'zolar',
+        data: MEMBERS,
+        backgroundColor: 'rgba(16,185,129,0.75)',
+        borderRadius: 4,
+      }
+    ]
+  },
+  options: commonOptions
+});
+
+// ── Violations chart ──────────────────────────────────
+new Chart(document.getElementById('violationsChart'), {
+  type: 'bar',
+  data: {
+    labels: LABELS,
+    datasets: [
+      {
+        label: '👮 Admin buzishlar',
+        data: VIOL,
+        backgroundColor: 'rgba(239,68,68,0.70)',
+        borderRadius: 4,
+      }
+    ]
+  },
+  options: commonOptions
+});
+</script>
+
+<style>
+/* ── Stats Dashboard Styles ─────────────────────────── */
+.stats-dashboard {
+  background: var(--bg-main, #0f1117);
+  padding: 4px 0 24px;
+}
+.stats-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding: 0 4px;
+}
+.stats-header h2 {
+  color: var(--text-heading, #f1f5f9) !important;
+  font-size: 18px !important;
+  font-weight: 700 !important;
+  margin: 0 !important;
+}
+.stats-period {
+  color: var(--text-muted, #94a3b8);
+  font-size: 13px;
+}
+
+/* ── Cards ───────────────────────────────────────────── */
+.stat-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+.stat-card {
+  background: var(--bg-card, #1a1d27);
+  border: 1px solid var(--border, #2a2d3e);
+  border-radius: 14px;
+  padding: 18px 16px;
+  text-align: center;
+  transition: transform 0.18s, box-shadow 0.18s;
+}
+.stat-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+}
+.stat-icon   { font-size: 26px; margin-bottom: 8px; }
+.stat-value  { font-size: 28px; font-weight: 800; line-height: 1; }
+.stat-label  { font-size: 11.5px; color: var(--text-muted, #94a3b8); margin-top: 5px; }
+
+.stat-warn  { border-top: 3px solid #f59e0b; }
+.stat-warn  .stat-value { color: #f59e0b; }
+.stat-ban   { border-top: 3px solid #ef4444; }
+.stat-ban   .stat-value { color: #ef4444; }
+.stat-link  { border-top: 3px solid #6366f1; }
+.stat-link  .stat-value { color: #6366f1; }
+.stat-member { border-top: 3px solid #10b981; }
+.stat-member .stat-value { color: #10b981; }
+.stat-violation { border-top: 3px solid #f43f5e; }
+.stat-violation .stat-value { color: #f43f5e; }
+
+/* ── Charts ──────────────────────────────────────────── */
+.chart-section {
+  margin-bottom: 20px;
+}
+.chart-two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.chart-wide {
+  width: 100%;
+}
+.chart-card {
+  background: var(--bg-card, #1a1d27);
+  border: 1px solid var(--border, #2a2d3e);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.chart-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border, #2a2d3e);
+}
+.chart-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-heading, #f1f5f9);
+}
+.chart-subtitle {
+  font-size: 12px;
+  color: var(--text-muted, #94a3b8);
+}
+.chart-body {
+  padding: 16px 18px;
+}
+.stats-table-section {
+  background: var(--bg-card, #1a1d27);
+  border: 1px solid var(--border, #2a2d3e);
+  border-radius: 14px;
+  overflow: hidden;
+  margin-top: 8px;
+}
+@media (max-width: 768px) {
+  .chart-two-col { grid-template-columns: 1fr; }
+  .stat-cards-grid { grid-template-columns: repeat(2, 1fr); }
+}
+</style>
+{% endblock %}
