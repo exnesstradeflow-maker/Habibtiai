@@ -379,6 +379,13 @@ class Moderator:
         count  = await self._get_warn(uid) + 1
         await self._set_warn(uid, count)
 
+        # Kunlik warn statistikasini oshiramiz
+        try:
+            from __main__ import increment_daily_warn as _idw
+            await _idw()
+        except Exception:
+            pass
+
         if count >= 3:
             # ── 3/3 → Ban ──────────────────────────────────────
             try:
@@ -902,6 +909,13 @@ class Moderator:
 
             count = await self._get_warn(uid) + 1
             await self._set_warn(uid, count)
+
+            # Kunlik warn statistikasini oshiramiz
+            try:
+                from __main__ import increment_daily_warn as _idw
+                await _idw()
+            except Exception:
+                pass
 
             if count >= 3:
                 await self.bot.ban_chat_member(chat_id=self.main_chat, user_id=uid)
