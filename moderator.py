@@ -52,6 +52,22 @@ def _now() -> str:
     """Hozirgi vaqtni Toshkent vaqti bilan qaytaradi."""
     return datetime.now(TZ).strftime("%d.%m.%Y %H:%M")
 
+async def safe_reply(message: types.Message, text: str, **kwargs):
+    """
+    O'chirilgan xabarga reply qilishda xato bo'lmasligi uchun.
+    Agar original xabar o'chirilgan bo'lsa, oddiy xabar yuboradi.
+    """
+    try:
+        return await message.reply(text, **kwargs)
+    except Exception:
+        try:
+            return await message.answer(text, **kwargs)
+        except Exception:
+            pass
+
+
+
+
 
 def _warn_bar(count: int, total: int = 3) -> str:
     """
@@ -366,13 +382,13 @@ class Moderator:
 
         uid, fname, uname = await self._get_target(message)
         if not uid:
-            return await message.reply(
+            return await safe_reply(message, 
                 "❗ <b>Ishlatish:</b> <code>/warn</code> + reply yoki <code>/warn @username sabab</code>",
                 parse_mode="HTML"
             )
 
         if await self._is_admin(self.main_chat, uid):
-            return await message.reply("⛔ Admin ogohlantirish olmaydi!")
+            return await safe_reply(message, "⛔ Admin ogohlantirish olmaydi!")
 
         admin  = message.from_user.first_name or "Admin"
         reason = self._get_reason(message)
@@ -394,7 +410,7 @@ class Moderator:
                 if self._inc_blocked:
                     await self._inc_blocked()
 
-                await message.reply(
+                await safe_reply(message, 
                     _action_card(
                         "🚫🔨", "BAN  (Warn to'ldi)",
                         fname, uid, admin, reason,
@@ -411,10 +427,10 @@ class Moderator:
                     user_id=uid, unblock=True
                 )
             except Exception as e:
-                await message.reply(f"❌ Ban xatolik: {e}")
+                await safe_reply(message, f"❌ Ban xatolik: {e}")
         else:
             # ── Warn kartochkasi ────────────────────────────────
-            await message.reply(
+            await safe_reply(message, 
                 _warn_card(fname, uid, admin, count, reason),
                 parse_mode="HTML",
                 reply_markup=self._mod_kb(uid, count)
@@ -433,14 +449,14 @@ class Moderator:
 
         uid, fname, uname = await self._get_target(message)
         if not uid:
-            return await message.reply(
+            return await safe_reply(message, 
                 "❗ <b>Ishlatish:</b> <code>/unwarn</code> + reply yoki <code>/unwarn @username</code>",
                 parse_mode="HTML"
             )
 
         count = await self._get_warn(uid)
         if count <= 0:
-            return await message.reply(
+            return await safe_reply(message, 
                 f"ℹ️ <b>{fname}</b> ning ogohlantirishlari yo'q.",
                 parse_mode="HTML"
             )
@@ -450,7 +466,7 @@ class Moderator:
         await self._set_warn(uid, new_count)
         bar = _warn_bar(new_count)
 
-        await message.reply(
+        await safe_reply(message, 
             f"✅ <b>OGOHLANTIRISH OLIB TASHLANDI</b>\n"
             f"{_divider()}\n"
             f"👤 <b>Foydalanuvchi:</b> {fname}\n"
@@ -502,10 +518,10 @@ class Moderator:
 
             warnings = await _fetch()
         except Exception as e:
-            return await message.reply(f"❌ Ma'lumot olishda xatolik: {e}")
+            return await safe_reply(message, f"❌ Ma'lumot olishda xatolik: {e}")
 
         if not warnings:
-            return await message.reply(
+            return await safe_reply(message, 
                 f"✅ <b>Hozircha hech kim ogohlantirish olmagan.</b>",
                 parse_mode="HTML"
             )
@@ -523,7 +539,7 @@ class Moderator:
                 f"   🆔 <code>{w['user_id']}</code>"
             )
         lines.append(_divider())
-        await message.reply("\n".join(lines), parse_mode="HTML")
+        await safe_reply(message, "\n".join(lines), parse_mode="HTML")
 
     # ─── /ban ────────────────────────────────────────────────
     async def _cmd_ban(self, message: types.Message):
@@ -531,7 +547,7 @@ class Moderator:
             return
 
         if self._check_bot_perm and not await self._check_bot_perm(self.main_chat, "can_restrict_members"):
-            return await message.reply(
+            return await safe_reply(message, 
                 "⚠️ <b>Botda 'Foydalanuvchilarni cheklash' huquqi yo'q!</b>\n"
                 "Guruh sozlamalarida botga ushbu huquqni bering.",
                 parse_mode="HTML"
@@ -539,13 +555,13 @@ class Moderator:
 
         uid, fname, uname = await self._get_target(message)
         if not uid:
-            return await message.reply(
+            return await safe_reply(message, 
                 "❗ <b>Ishlatish:</b> <code>/ban</code> + reply yoki <code>/ban @username sabab</code>",
                 parse_mode="HTML"
             )
 
         if await self._is_admin(self.main_chat, uid):
-            return await message.reply("⛔ Adminni ban qilib bo'lmaydi!")
+            return await safe_reply(message, "⛔ Adminni ban qilib bo'lmaydi!")
 
         admin  = message.from_user.first_name or "Admin"
         reason = self._get_reason(message)
@@ -556,7 +572,7 @@ class Moderator:
             if self._inc_blocked:
                 await self._inc_blocked()
 
-            await message.reply(
+            await safe_reply(message, 
                 _action_card("🚫", "BAN", fname, uid, admin, reason),
                 parse_mode="HTML",
                 reply_markup=self._unban_only_kb(uid)
@@ -566,7 +582,7 @@ class Moderator:
                 user_id=uid, unblock=True
             )
         except Exception as e:
-            await message.reply(f"❌ Ban qilishda xatolik: {e}")
+            await safe_reply(message, f"❌ Ban qilishda xatolik: {e}")
 
     # ─── /unban ──────────────────────────────────────────────
     async def _cmd_unban(self, message: types.Message):
@@ -575,7 +591,7 @@ class Moderator:
 
         uid, fname, uname = await self._get_target(message)
         if not uid:
-            return await message.reply(
+            return await safe_reply(message, 
                 "❗ <b>Ishlatish:</b> <code>/unban</code> + reply yoki <code>/unban @username</code>",
                 parse_mode="HTML"
             )
@@ -590,7 +606,7 @@ class Moderator:
                 if "PARTICIPANT_ID_INVALID" not in str(ue):
                     raise
 
-            await message.reply(
+            await safe_reply(message, 
                 f"✅ <b>UNBAN</b>\n"
                 f"{_divider()}\n"
                 f"👤 <b>Foydalanuvchi:</b> {fname}\n"
@@ -605,7 +621,7 @@ class Moderator:
                 _log_card("✅", "UNBAN", fname, uname, uid, admin)
             )
         except Exception as e:
-            await message.reply(f"❌ Unban xatolik: {e}")
+            await safe_reply(message, f"❌ Unban xatolik: {e}")
 
     # ─── /mute ───────────────────────────────────────────────
     async def _cmd_mute(self, message: types.Message):
@@ -613,20 +629,20 @@ class Moderator:
             return
 
         if self._check_bot_perm and not await self._check_bot_perm(self.main_chat, "can_restrict_members"):
-            return await message.reply(
+            return await safe_reply(message, 
                 "⚠️ <b>Botda 'Cheklash' huquqi yo'q!</b>",
                 parse_mode="HTML"
             )
 
         uid, fname, uname = await self._get_target(message)
         if not uid:
-            return await message.reply(
+            return await safe_reply(message, 
                 "❗ <b>Ishlatish:</b> <code>/mute</code> + reply yoki <code>/mute @username sabab</code>",
                 parse_mode="HTML"
             )
 
         if await self._is_admin(self.main_chat, uid):
-            return await message.reply("⛔ Adminni mute qilib bo'lmaydi!")
+            return await safe_reply(message, "⛔ Adminni mute qilib bo'lmaydi!")
 
         admin  = message.from_user.first_name or "Admin"
         reason = self._get_reason(message)
@@ -637,7 +653,7 @@ class Moderator:
                 user_id=uid,
                 permissions=ChatPermissions(can_send_messages=False)
             )
-            await message.reply(
+            await safe_reply(message, 
                 _action_card("🔇", "MUTE", fname, uid, admin, reason,
                              extra="🔕 Foydalanuvchi xabar yoza olmaydi."),
                 parse_mode="HTML",
@@ -647,7 +663,7 @@ class Moderator:
                 _log_card("🔇", "MUTE", fname, uname, uid, admin, reason)
             )
         except Exception as e:
-            await message.reply(f"❌ Mute xatolik: {e}")
+            await safe_reply(message, f"❌ Mute xatolik: {e}")
 
     # ─── /unmute ─────────────────────────────────────────────
     async def _cmd_unmute(self, message: types.Message):
@@ -656,7 +672,7 @@ class Moderator:
 
         uid, fname, uname = await self._get_target(message)
         if not uid:
-            return await message.reply(
+            return await safe_reply(message, 
                 "❗ <b>Ishlatish:</b> <code>/unmute</code> + reply yoki <code>/unmute @username</code>",
                 parse_mode="HTML"
             )
@@ -673,7 +689,7 @@ class Moderator:
                     can_add_web_page_previews=True,
                 )
             )
-            await message.reply(
+            await safe_reply(message, 
                 f"🔊 <b>UNMUTE</b>\n"
                 f"{_divider()}\n"
                 f"👤 <b>Foydalanuvchi:</b> {fname}\n"
@@ -688,7 +704,7 @@ class Moderator:
                 _log_card("🔊", "UNMUTE", fname, uname, uid, admin)
             )
         except Exception as e:
-            await message.reply(f"❌ Unmute xatolik: {e}")
+            await safe_reply(message, f"❌ Unmute xatolik: {e}")
 
     # ─── /info ───────────────────────────────────────────────
     async def _cmd_info(self, message: types.Message):
@@ -697,7 +713,7 @@ class Moderator:
 
         uid, _, uname = await self._get_target(message)
         if not uid:
-            return await message.reply(
+            return await safe_reply(message, 
                 "❗ <b>Ishlatish:</b> <code>/info</code> + reply yoki <code>/info @username</code>",
                 parse_mode="HTML"
             )
@@ -761,7 +777,7 @@ class Moderator:
                 f"{_divider()}"
             )
 
-        await message.reply(
+        await safe_reply(message, 
             text, parse_mode="HTML",
             disable_web_page_preview=True,
             reply_markup=self._mod_kb(uid, warn_count)
@@ -787,7 +803,7 @@ class Moderator:
             if uname.startswith("@") else uname
         )
 
-        await message.reply(
+        await safe_reply(message, 
             f"🪪 <b>SHAXS KARTOCHKASI</b>\n"
             f"{_divider()}\n"
             f"📛 <b>Ismi:</b> {fname}\n"
@@ -804,17 +820,17 @@ class Moderator:
     # ─── /admin ──────────────────────────────────────────────
     async def _cmd_admin(self, message: types.Message):
         if not (self._is_bot_admin and await self._is_bot_admin(message.from_user.id)):
-            return await message.reply("❌ Sizda bunday huquq yo'q!")
+            return await safe_reply(message, "❌ Sizda bunday huquq yo'q!")
 
         if self._check_bot_perm and not await self._check_bot_perm(self.main_chat, "can_promote_members"):
-            return await message.reply(
+            return await safe_reply(message, 
                 "⚠️ <b>Botda 'Admin boshqarish' huquqi yo'q!</b>",
                 parse_mode="HTML"
             )
 
         uid, fname, uname = await self._get_target(message)
         if not uid:
-            return await message.reply(
+            return await safe_reply(message, 
                 "❗ <b>Ishlatish:</b> <code>/admin</code> + reply yoki <code>/admin @username</code>",
                 parse_mode="HTML"
             )
@@ -828,7 +844,7 @@ class Moderator:
                 can_pin_messages     = True,
                 can_invite_users     = True,
             )
-            await message.reply(
+            await safe_reply(message, 
                 _action_card("👑", "ADMIN QO'SHILDI", fname, uid, admin),
                 parse_mode="HTML"
             )
@@ -836,16 +852,16 @@ class Moderator:
                 _log_card("👑", "ADMIN QO'SHILDI", fname, uname, uid, admin)
             )
         except Exception as e:
-            await message.reply(f"❌ Admin qilishda xatolik: {e}")
+            await safe_reply(message, f"❌ Admin qilishda xatolik: {e}")
 
     # ─── /unadmin ────────────────────────────────────────────
     async def _cmd_unadmin(self, message: types.Message):
         if not (self._is_bot_admin and await self._is_bot_admin(message.from_user.id)):
-            return await message.reply("❌ Sizda bunday huquq yo'q!")
+            return await safe_reply(message, "❌ Sizda bunday huquq yo'q!")
 
         uid, fname, uname = await self._get_target(message)
         if not uid:
-            return await message.reply(
+            return await safe_reply(message, 
                 "❗ <b>Ishlatish:</b> <code>/unadmin</code> + reply yoki <code>/unadmin @username</code>",
                 parse_mode="HTML"
             )
@@ -860,7 +876,7 @@ class Moderator:
                 can_invite_users     = False,
                 can_manage_chat      = False,
             )
-            await message.reply(
+            await safe_reply(message, 
                 _action_card("❌", "ADMIN OLIB TASHLANDI", fname, uid, admin),
                 parse_mode="HTML"
             )
@@ -868,7 +884,7 @@ class Moderator:
                 _log_card("❌", "UNADMIN", fname, uname, uid, admin)
             )
         except Exception as e:
-            await message.reply(f"❌ Unadmin xatolik: {e}")
+            await safe_reply(message, f"❌ Unadmin xatolik: {e}")
 
     # ══════════════════════════════════════════════════════════
     # 🔘  INLINE TUGMA CALLBACKLARI  (prefiksi: "m_")
