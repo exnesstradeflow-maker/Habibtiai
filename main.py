@@ -147,6 +147,7 @@ if not settings.configured:
                 "auth.Group":                "fas fa-users",
                 "__main__.BotAdmin":         "fas fa-user-cog",
                 "__main__.BotOwner":         "fas fa-crown",
+                "__main__.GroupAdminPromotion": "fas fa-star",
                 "__main__.BotStats":         "fas fa-chart-bar",
                 "__main__.DailyStats":       "fas fa-calendar-alt",
                 "__main__.GroupActivity":    "fas fa-users",
@@ -164,6 +165,7 @@ if not settings.configured:
             "order_with_respect_to": [
                 "__main__.BotSetting",
                 "__main__.BotOwner",
+                "__main__.GroupAdminPromotion",
                 "__main__.BotStats",
                 "__main__.DailyStats",
                 "__main__.GroupActivity",
@@ -411,6 +413,23 @@ class BotOwner(models.Model):
         app_label = '__main__'
         verbose_name = "Bot Egasi"
         verbose_name_plural = "Bot Egasi (Owner)"
+
+
+class GroupAdminPromotion(models.Model):
+    """Admin paneldan foydalanuvchini guruhda admin qilish."""
+    user_id    = models.BigIntegerField("Telegram ID", unique=True)
+    username   = models.CharField("Username (ixtiyoriy)", max_length=150, null=True, blank=True)
+    first_name = models.CharField("Ismi (ixtiyoriy)", max_length=150, null=True, blank=True)
+    promoted_at = models.DateTimeField("Admin qilingan vaqti", auto_now_add=True)
+    is_promoted = models.BooleanField("Admin qilinganmi?", default=False, editable=False)
+
+    def __str__(self):
+        return f"{self.first_name or 'User'} ({self.user_id})"
+
+    class Meta:
+        app_label = '__main__'
+        verbose_name = "Guruhda Admin Qilish"
+        verbose_name_plural = "Guruhda Admin Qilish"
 
 
 class BotStats(models.Model):
@@ -664,6 +683,90 @@ if not admin.site.is_registered(BotOwner):
                 request,
                 f"✅ Bot egasi ({obj.user_id}) saqlandi. "
                 "Bot keyingi guruhga qo'shilganida uni avtomatik admin qiladi.",
+            )
+
+
+if not admin.site.is_registered(GroupAdminPromotion):
+    @admin.register(GroupAdminPromotion)
+    class GroupAdminPromotionAdmin(admin.ModelAdmin):
+        list_display   = ('user_id', 'username', 'first_name', 'is_promoted', 'promoted_at')
+        search_fields  = ('user_id', 'username', 'first_name')
+        ordering       = ('-promoted_at',)
+        readonly_fields = ('promoted_at', 'is_promoted')
+        fieldsets = (
+            ("⭐ Guruhda Admin Qilish", {
+                'fields': ('user_id', 'username', 'first_name'),
+                'description': (
+                    '<p style="color:#ffd700; font-size:13px;">'
+                    '⭐ <b>Guruhda Admin Qilish</b> — Telegram ID ni kiriting, '
+                    'saqlashingiz bilan bot o\'sha foydalanuvchini MAIN_CHAT_ID guruhida '
+                    'barcha admin huquqlari bilan darhol admin qiladi.<br>'
+                    '⚠️ Bot guruhda admin bo\'lishi va <b>can_promote_members</b> huquqiga ega bo\'lishi shart.<br>'
+                    '📌 Telegram ID ni raqam ko\'rinishida kiriting (masalan: 123456789).<br>'
+                    '🔍 ID ni bilish uchun: @userinfobot yoki @RawDataBot ga yozing.'
+                    '</p>'
+                )
+            }),
+            ("Ma'lumot", {
+                'fields': ('is_promoted', 'promoted_at'),
+                'classes': ('collapse',),
+            }),
+        )
+
+        def save_model(self, request, obj, form, change):
+            super().save_model(request, obj, form, change)
+            import threading
+
+            def do_promote(uid=obj.user_id, fname=obj.first_name or str(obj.user_id)):
+                try:
+                    if _main_loop is None:
+                        logger.error("❌ Asosiy event loop tayyor emas — promote bajarilmadi!")
+                        return
+
+                    async def _promote():
+                        try:
+                            # Barcha mavjud admin huquqlarini berish
+                            await bot.promote_chat_member(
+                                chat_id=MAIN_CHAT_ID,
+                                user_id=uid,
+                                can_manage_chat=True,
+                                can_delete_messages=True,
+                                can_restrict_members=True,
+                                can_promote_members=True,
+                                can_change_info=True,
+                                can_invite_users=True,
+                                can_pin_messages=True,
+                                can_manage_video_chats=True,
+                            )
+                            # is_promoted = True
+                            await asyncio.get_event_loop().run_in_executor(
+                                None,
+                                lambda: GroupAdminPromotion.objects.filter(user_id=uid).update(is_promoted=True)
+                            )
+                            await send_log(
+                                f"⭐ <b>Foydalanuvchi guruhda admin qilindi!</b>\n"
+                                f"👤 {fname} — <code>{uid}</code>\n"
+                                f"✅ Barcha admin huquqlari berildi."
+                            )
+                            logger.info(f"✅ User {uid} guruhda admin qilindi.")
+                        except Exception as e:
+                            logger.error(f"❌ Admin qilishda xatolik (ID {uid}): {e}")
+                            await send_log(
+                                f"⚠️ <b>Admin qilishda xatolik!</b>\n"
+                                f"👤 <code>{uid}</code>\n"
+                                f"❌ Xato: {e}"
+                            )
+
+                    future = asyncio.run_coroutine_threadsafe(_promote(), _main_loop)
+                    future.result(timeout=30)
+                except Exception as e:
+                    logger.error(f"Promote thread xatolik: {e}")
+
+            threading.Thread(target=do_promote, daemon=True).start()
+            self.message_user(
+                request,
+                f"⭐ Foydalanuvchi ({obj.user_id}) admin qilish jarayoni boshlandi. "
+                "Log kanaliga natija keladi.",
             )
 
 
