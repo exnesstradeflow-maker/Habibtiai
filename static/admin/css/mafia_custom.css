@@ -1,38 +1,38 @@
 /* ═══════════════════════════════════════════════════════════════
    Mafia Habibiti — Zamonaviy Admin Panel Dizayni
-   Oq/Qora, Kun/Tun rejimi avtomatik
+   Qoramtir (Dark) rejim — har doim aktiv
    ═══════════════════════════════════════════════════════════════ */
 
-/* ── CSS O'ZGARUVCHILAR (Kun rejimi) ─────────────────────────── */
+/* ── CSS O'ZGARUVCHILAR (Dark rejim — default) ────────────────── */
 :root {
-  --bg-main:        #f4f6f9;
-  --bg-card:        #ffffff;
-  --bg-sidebar:     #1a1a2e;
-  --bg-navbar:      #16213e;
-  --bg-hover:       #f0f4ff;
-  --bg-input:       #ffffff;
-  --bg-table-head:  #f8f9fc;
-  --bg-table-row:   #ffffff;
-  --bg-table-alt:   #f8faff;
-  --bg-badge:       #eef2ff;
+  --bg-main:        #0f1117;
+  --bg-card:        #1a1d27;
+  --bg-sidebar:     #111318;
+  --bg-navbar:      #0d0f18;
+  --bg-hover:       #1e2235;
+  --bg-input:       #1e2235;
+  --bg-table-head:  #161924;
+  --bg-table-row:   #1a1d27;
+  --bg-table-alt:   #1e2235;
+  --bg-badge:       #1e2235;
 
-  --text-main:      #1e293b;
-  --text-muted:     #64748b;
-  --text-sidebar:   #c8d6f5;
+  --text-main:      #e2e8f0;
+  --text-muted:     #94a3b8;
+  --text-sidebar:   #94a3b8;
   --text-sidebar-active: #ffffff;
-  --text-label:     #475569;
-  --text-heading:   #0f172a;
+  --text-label:     #94a3b8;
+  --text-heading:   #f1f5f9;
 
-  --accent:         #4f46e5;
-  --accent-hover:   #4338ca;
-  --accent-light:   #eef2ff;
-  --accent-glow:    rgba(79, 70, 229, 0.15);
+  --accent:         #6366f1;
+  --accent-hover:   #818cf8;
+  --accent-light:   #1e2045;
+  --accent-glow:    rgba(99, 102, 241, 0.20);
 
-  --border:         #e2e8f0;
-  --border-focus:   #4f46e5;
-  --shadow-sm:      0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
-  --shadow-md:      0 4px 16px rgba(0,0,0,0.08);
-  --shadow-lg:      0 8px 32px rgba(0,0,0,0.10);
+  --border:         #2a2d3e;
+  --border-focus:   #6366f1;
+  --shadow-sm:      0 1px 3px rgba(0,0,0,0.3);
+  --shadow-md:      0 4px 16px rgba(0,0,0,0.4);
+  --shadow-lg:      0 8px 32px rgba(0,0,0,0.5);
 
   --success:        #10b981;
   --danger:         #ef4444;
@@ -48,39 +48,8 @@
   --transition:     0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* ── TUN REJIMI (brauzer sozlamasiga qarab avtomatik) ─────────── */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg-main:        #0f1117;
-    --bg-card:        #1a1d27;
-    --bg-sidebar:     #111318;
-    --bg-navbar:      #0d0f18;
-    --bg-hover:       #1e2235;
-    --bg-input:       #1e2235;
-    --bg-table-head:  #161924;
-    --bg-table-row:   #1a1d27;
-    --bg-table-alt:   #1e2235;
-    --bg-badge:       #1e2235;
-
-    --text-main:      #e2e8f0;
-    --text-muted:     #94a3b8;
-    --text-sidebar:   #94a3b8;
-    --text-sidebar-active: #ffffff;
-    --text-label:     #94a3b8;
-    --text-heading:   #f1f5f9;
-
-    --accent:         #6366f1;
-    --accent-hover:   #818cf8;
-    --accent-light:   #1e2045;
-    --accent-glow:    rgba(99, 102, 241, 0.20);
-
-    --border:         #2a2d3e;
-    --border-focus:   #6366f1;
-    --shadow-sm:      0 1px 3px rgba(0,0,0,0.3);
-    --shadow-md:      0 4px 16px rgba(0,0,0,0.4);
-    --shadow-lg:      0 8px 32px rgba(0,0,0,0.5);
-  }
-}
+/* ── IXTIYORIY: Agar brauzer light modeda bo'lsa ham qorang ko'rinadi ─ */
+/* (Dark rejim har doim aktiv — media query o'chirib qo'yildi) */
 
 /* ── FONT IMPORT ──────────────────────────────────────────────── */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
