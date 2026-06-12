@@ -2238,7 +2238,7 @@ async def check_flood(message: types.Message) -> bool:
 # ─────────────────────────────────────────────────────────────────────
 # NOTES BUYRUQLARI: /note, /getnote, /delnote, /notes + #kalit
 # ─────────────────────────────────────────────────────────────────────
-@dp.message(F.text.regexp(r'^/note\s+save\s+(\S+)\s+(.+)$', re.DOTALL))
+@dp.message(F.text.regexp(r'(?s)^/note\s+save\s+(\S+)\s+(.+)$'))
 async def cmd_note_save(message: types.Message):
     """Admin: /note save <kalit> <matn>"""
     if not (await is_bot_admin(message.from_user.id) or
