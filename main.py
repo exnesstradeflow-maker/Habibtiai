@@ -7,6 +7,9 @@ import random
 import asyncio
 import logging
 import aiohttp
+import time
+from collections import defaultdict, deque
+from datetime import datetime, timedelta
 from PIL import Image, ImageDraw, ImageFont
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -159,6 +162,8 @@ if not settings.configured:
                 "__main__.BotSetting":       "fas fa-cogs",
                 "__main__.GroupRule":        "fas fa-scroll",
                 "__main__.GroupMessage":     "fas fa-bullhorn",
+                "__main__.ScheduledMessage": "fas fa-clock",
+                "__main__.BotNote":          "fas fa-sticky-note",
             },
             "default_icon_parents":  "fas fa-chevron-circle-right",
             "default_icon_children": "fas fa-circle",
@@ -171,6 +176,8 @@ if not settings.configured:
                 "__main__.GroupActivity",
                 "__main__.BotAdmin",
                 "__main__.GroupMessage",
+                "__main__.ScheduledMessage",
+                "__main__.BotNote",
                 "__main__.GroupRule",
                 "__main__.TelegramUser",
                 "__main__.BroadcastMessage",
@@ -218,18 +225,68 @@ if not settings.configured:
 # 4. MODELLAR
 # =====================================================================
 class BotSetting(models.Model):
-    is_captcha_active      = models.BooleanField("Kaptcha faolmi? / Активна ли каптча?", default=True)
-    is_link_active         = models.BooleanField("Havola olish faolmi? / Активна ли кнопка ссылки?", default=True)
-    is_join_request_active   = models.BooleanField("Arizalarni qabul qilsinmi? / Принимать заявки?", default=True)
-    is_subscription_active   = models.BooleanField(
-        "Botga /start bosmaganlar yoza olmasinmi? / Блокировать незарегистрированных?",
+    is_captcha_active      = models.BooleanField("Kaptcha faolmi?", default=True)
+    is_link_active         = models.BooleanField("Havola olish faolmi?", default=True)
+    is_join_request_active = models.BooleanField("Arizalarni qabul qilsinmi?", default=True)
+    is_subscription_active = models.BooleanField(
+        "Botga /start bosmaganlar yoza olmasinmi?",
         default=False,
         help_text="Yoqilsa — botga /start bosmagan foydalanuvchilar guruhda yoza olmaydi."
     )
     admin_rules_active = models.BooleanField(
         "Qoidalar adminlarga ham ishlashmi?",
         default=False,
-        help_text="Yoqilsa — adminlar ham so'kinish va rasm tekshiruviga uchraydi (AdminViolation sifatida hisoblanadi)."
+        help_text="Yoqilsa — adminlar ham so'kinish va rasm tekshiruviga uchraydi."
+    )
+    # ── Welcome ──────────────────────────────────────────────────────
+    is_welcome_active = models.BooleanField(
+        "Guruhda xush kelibsiz xabari",
+        default=True,
+        help_text="Yoqilsa — yangi a'zo kirganida guruhda salom xabari yuboriladi."
+    )
+    welcome_text = models.TextField(
+        "Xush kelibsiz matni",
+        default="👋 Salom, {name}! Guruhga xush kelibsiz! 🎉\n\nQoidalarga rioya qiling va yaxshi muloqot qiling. 😊",
+        help_text="Ishlatish mumkin bo'lgan o'zgaruvchilar: {name} — foydalanuvchi ismi, {username} — username, {count} — a'zolar soni."
+    )
+    # ── Flood control ─────────────────────────────────────────────────
+    is_flood_active = models.BooleanField(
+        "Flood nazorati (anti-spam)",
+        default=True,
+        help_text="Yoqilsa — qisqa vaqtda ko'p xabar yuborganlar mutega olinadi."
+    )
+    flood_limit = models.PositiveIntegerField(
+        "Flood: max xabar soni",
+        default=5,
+        help_text="Qancha xabar yuborilsa flood deb hisoblansin (default: 5)."
+    )
+    flood_window = models.PositiveIntegerField(
+        "Flood: vaqt oynasi (soniya)",
+        default=10,
+        help_text="Necha soniya ichida xabarlar sanalsin (default: 10s)."
+    )
+    flood_mute_seconds = models.PositiveIntegerField(
+        "Flood: mute muddati (soniya)",
+        default=300,
+        help_text="Flood qilganda necha soniya mute qilinsin (default: 300 = 5 daqiqa)."
+    )
+    # ── Anti-link ─────────────────────────────────────────────────────
+    is_anti_link = models.BooleanField(
+        "Anti-link (adminlarsiz havola taqiq)",
+        default=False,
+        help_text="Yoqilsa — faqat adminlar havola yubora oladi, qolganlarga ogohlantirish beriladi."
+    )
+    # ── Media filter ──────────────────────────────────────────────────
+    is_media_filter_active = models.BooleanField(
+        "Media filter (rasm/video/stiker taqiq)",
+        default=False,
+        help_text="Yoqilsa — adminlardan boshqa hech kim media yubora olmaydi."
+    )
+    # ── Warn limit ────────────────────────────────────────────────────
+    warn_limit = models.PositiveIntegerField(
+        "Ogohlantirish limiti (ban oldin)",
+        default=3,
+        help_text="Nechta ogohlantirishdan keyin foydalanuvchi banlansin (default: 3)."
     )
 
     class Meta:
@@ -538,26 +595,83 @@ class GroupMessage(models.Model):
         verbose_name_plural = "Guruhga Xabar Yuborish"
 
 
+class ScheduledMessage(models.Model):
+    """Rejalashtirilgan xabarlar — belgilangan vaqtda guruhga yuboriladi."""
+    REPEAT_CHOICES = [
+        ('once',   'Bir marta'),
+        ('hourly', 'Har soat'),
+        ('daily',  'Har kuni'),
+        ('weekly', 'Har hafta'),
+    ]
+    title      = models.CharField("Sarlavha", max_length=200)
+    text       = models.TextField("Xabar matni (HTML qo'llab-quvvatlanadi)")
+    send_at    = models.DateTimeField(
+        "Yuborish vaqti (UTC)",
+        help_text="Birinchi yuborish vaqtini belgilang."
+    )
+    repeat     = models.CharField("Takrorlash", max_length=10, choices=REPEAT_CHOICES, default='once')
+    is_active  = models.BooleanField("Faolmi?", default=True)
+    last_sent  = models.DateTimeField("Oxirgi yuborildi", null=True, blank=True)
+    created_at = models.DateTimeField("Yaratilgan", auto_now_add=True)
+
+    class Meta:
+        app_label = '__main__'
+        verbose_name = "Rejalashtirilgan Xabar"
+        verbose_name_plural = "Rejalashtirilgan Xabarlar"
+        ordering = ['send_at']
+
+    def __str__(self):
+        return f"{self.title} → {self.send_at.strftime('%d.%m.%Y %H:%M')}"
+
+
+class BotNote(models.Model):
+    """Eslatmalar — /note save bilan saqlash, #kalit bilan chaqirish."""
+    keyword    = models.CharField(
+        "Kalit so'z", max_length=100, unique=True,
+        help_text="Masalan: qoidalar, admin, link"
+    )
+    text       = models.TextField(
+        "Eslatma matni",
+        help_text="HTML teglari: <b>, <i>, <code>, <a href=...>"
+    )
+    created_by = models.BigIntegerField("Kim qo'shgan (ID)", null=True, blank=True)
+    created_at = models.DateTimeField("Yaratilgan", auto_now_add=True)
+    updated_at = models.DateTimeField("Yangilangan", auto_now=True)
+
+    class Meta:
+        app_label = '__main__'
+        verbose_name = "Eslatma (Note)"
+        verbose_name_plural = "Eslatmalar (Notes)"
+        ordering = ['keyword']
+
+    def __str__(self):
+        return f"#{self.keyword}"
+
+
 # =====================================================================
 # 5. ADMIN REGISTRATSIYA
 # =====================================================================
 if not admin.site.is_registered(BotSetting):
     @admin.register(BotSetting)
     class BotSettingAdmin(admin.ModelAdmin):
-        list_display  = ('__str__', 'is_captcha_active', 'is_link_active', 'is_join_request_active', 'is_subscription_active', 'admin_rules_active')
+        list_display = ('__str__', 'is_captcha_active', 'is_anti_link', 'is_flood_active',
+                        'is_welcome_active', 'is_media_filter_active', 'warn_limit')
         fieldsets = (
-            ("⚙️ Bot Sozlamalari", {
-                'fields': ('is_captcha_active', 'is_link_active', 'is_join_request_active', 'is_subscription_active', 'admin_rules_active'),
-                'description': (
-                    '<p style="color:#ffd700; font-size:13px;">'
-                    '⚙️ Bu yerda botning asosiy funksiyalarini yoqib/o\'chirishingiz mumkin.<br>'
-                    '🔐 <b>Kaptcha</b> — Guruhga kirmoqchi bo\'lganlar uchun rasm-kod tekshiruvi.<br>'
-                    '🔗 <b>Havola olish</b> — Foydalanuvchilar bot orqali guruhga link ola olishi.<br>'
-                    '🚪 <b>Arizalarni qabul qilish</b> — Guruhga qo\'shilish arizalarini avtomatik qabul/rad qilish.<br>'
-                    '🤖 <b>Bot start tekshiruvi</b> — Botga /start bosmagan foydalanuvchilar guruhda yoza olmaydi.<br>'
-                    '👮 <b>Admin qoidalari</b> — Yoqilsa, adminlar ham so\'kinish/rasm tekshiruviga uchraydi.'
-                    '</p>'
-                )
+            ("⚙️ Asosiy Sozlamalar", {
+                'fields': ('is_captcha_active', 'is_link_active', 'is_join_request_active',
+                           'is_subscription_active', 'admin_rules_active'),
+            }),
+            ("👋 Xush Kelibsiz Xabari", {
+                'fields': ('is_welcome_active', 'welcome_text'),
+            }),
+            ("🛡 Flood Nazorati (Anti-Spam)", {
+                'fields': ('is_flood_active', 'flood_limit', 'flood_window', 'flood_mute_seconds'),
+            }),
+            ("🔗 Anti-Link & Media Filter", {
+                'fields': ('is_anti_link', 'is_media_filter_active'),
+            }),
+            ("⚠️ Ogohlantirish Tizimi", {
+                'fields': ('warn_limit',),
             }),
         )
 
@@ -1019,6 +1133,61 @@ if not admin.site.is_registered(GroupMessage):
             self.message_user(request, "✅ Xabar guruhga yuborilmoqda!")
         send_to_group_action.short_description = "📣 Tanlangan xabarlarni guruhga yuborish"
 
+if not admin.site.is_registered(ScheduledMessage):
+    @admin.register(ScheduledMessage)
+    class ScheduledMessageAdmin(admin.ModelAdmin):
+        list_display  = ('title', 'send_at', 'repeat', 'is_active', 'last_sent')
+        list_filter   = ('repeat', 'is_active')
+        ordering      = ('send_at',)
+        readonly_fields = ('last_sent', 'created_at')
+        fieldsets = (
+            ("⏰ Rejalashtirilgan Xabar", {
+                'fields': ('title', 'text', 'send_at', 'repeat', 'is_active'),
+                'description': (
+                    '<p style="color:#90ee90;font-size:13px;">'
+                    '⏰ Xabar belgilangan vaqtda guruhga avtomatik yuboriladi.<br>'
+                    '<b>Takrorlash:</b> Bir marta / Har soat / Har kuni / Har hafta.<br>'
+                    '📝 Matnda HTML teglar (<b>, <i>, <code>) ishlatsa bo\'ladi.<br>'
+                    '⚠️ Vaqtni UTC da kiriting. O\'zbekiston = UTC+5.'
+                    '</p>'
+                )
+            }),
+            ("📊 Holat", {
+                'fields': ('last_sent', 'created_at'),
+                'classes': ('collapse',)
+            }),
+        )
+
+if not admin.site.is_registered(BotNote):
+    @admin.register(BotNote)
+    class BotNoteAdmin(admin.ModelAdmin):
+        list_display  = ('keyword', 'text_preview', 'created_by', 'updated_at')
+        search_fields = ('keyword', 'text')
+        ordering      = ('keyword',)
+        readonly_fields = ('created_by', 'created_at', 'updated_at')
+        fieldsets = (
+            ("📝 Eslatma", {
+                'fields': ('keyword', 'text'),
+                'description': (
+                    '<p style="color:#87ceeb;font-size:13px;">'
+                    '📝 Bot buyruqlari:<br>'
+                    '• <code>/note save qoidalar [matn]</code> — saqlash<br>'
+                    '• <code>#qoidalar</code> yoki <code>/getnote qoidalar</code> — chaqirish<br>'
+                    '• <code>/delnote qoidalar</code> — o\'chirish<br>'
+                    '• <code>/notes</code> — barcha eslatmalar ro\'yxati'
+                    '</p>'
+                )
+            }),
+            ("Ma'lumot", {
+                'fields': ('created_by', 'created_at', 'updated_at'),
+                'classes': ('collapse',)
+            }),
+        )
+
+        def text_preview(self, obj):
+            return obj.text[:60] + "..." if len(obj.text) > 60 else obj.text
+        text_preview.short_description = "Matn (qisqa)"
+
 admin.site.site_header = "⚜ Mafia Habibiti"
 admin.site.index_title = "Boshqaruv paneli"
 
@@ -1230,18 +1399,90 @@ def is_bot_admin(user_id: int) -> bool:
 @sync_to_async
 def get_bot_settings_status():
     try:
-        setting = BotSetting.objects.first()
-        if not setting:
-            return {"captcha": True, "link": True, "join_request": True, "subscription": False, "admin_rules": False}
+        s = BotSetting.objects.first()
+        if not s:
+            return {
+                "captcha": True, "link": True, "join_request": True,
+                "subscription": False, "admin_rules": False,
+                "welcome": True, "flood": True, "anti_link": False,
+                "media_filter": False, "warn_limit": 3,
+                "flood_limit": 5, "flood_window": 10, "flood_mute": 300,
+                "welcome_text": "👋 Salom, {name}! Guruhga xush kelibsiz! 🎉",
+            }
         return {
-            "captcha":       setting.is_captcha_active,
-            "link":          setting.is_link_active,
-            "join_request":  setting.is_join_request_active,
-            "subscription":  setting.is_subscription_active,
-            "admin_rules":   setting.admin_rules_active,
+            "captcha":      s.is_captcha_active,
+            "link":         s.is_link_active,
+            "join_request": s.is_join_request_active,
+            "subscription": s.is_subscription_active,
+            "admin_rules":  s.admin_rules_active,
+            "welcome":      s.is_welcome_active,
+            "flood":        s.is_flood_active,
+            "anti_link":    s.is_anti_link,
+            "media_filter": s.is_media_filter_active,
+            "warn_limit":   s.warn_limit,
+            "flood_limit":  s.flood_limit,
+            "flood_window": s.flood_window,
+            "flood_mute":   s.flood_mute_seconds,
+            "welcome_text": s.welcome_text,
         }
     except Exception:
-        return {"captcha": True, "link": True, "join_request": True, "subscription": False, "admin_rules": False}
+        return {
+            "captcha": True, "link": True, "join_request": True,
+            "subscription": False, "admin_rules": False,
+            "welcome": True, "flood": True, "anti_link": False,
+            "media_filter": False, "warn_limit": 3,
+            "flood_limit": 5, "flood_window": 10, "flood_mute": 300,
+            "welcome_text": "👋 Salom, {name}! Guruhga xush kelibsiz! 🎉",
+        }
+
+@sync_to_async
+def get_note(keyword: str):
+    try:
+        return BotNote.objects.get(keyword=keyword.lower().strip())
+    except BotNote.DoesNotExist:
+        return None
+
+@sync_to_async
+def save_note(keyword: str, text: str, user_id: int):
+    obj, created = BotNote.objects.update_or_create(
+        keyword=keyword.lower().strip(),
+        defaults={'text': text, 'created_by': user_id}
+    )
+    return created  # True = yangi, False = yangilandi
+
+@sync_to_async
+def delete_note(keyword: str) -> bool:
+    deleted, _ = BotNote.objects.filter(keyword=keyword.lower().strip()).delete()
+    return deleted > 0
+
+@sync_to_async
+def get_all_notes():
+    return list(BotNote.objects.values_list('keyword', flat=True).order_by('keyword'))
+
+@sync_to_async
+def get_scheduled_messages_to_send():
+    """Hozir yuborilishi kerak bo'lgan faol xabarlarni qaytaradi."""
+    now = datetime.utcnow()
+    msgs = list(ScheduledMessage.objects.filter(is_active=True, send_at__lte=now))
+    return msgs
+
+@sync_to_async
+def update_scheduled_after_send(msg_id: int, repeat: str):
+    """Xabar yuborilgandan keyin send_at ni yangilaydi yoki o'chiradi."""
+    try:
+        msg = ScheduledMessage.objects.get(pk=msg_id)
+        msg.last_sent = datetime.utcnow()
+        if repeat == 'once':
+            msg.is_active = False
+        elif repeat == 'hourly':
+            msg.send_at = msg.send_at + timedelta(hours=1)
+        elif repeat == 'daily':
+            msg.send_at = msg.send_at + timedelta(days=1)
+        elif repeat == 'weekly':
+            msg.send_at = msg.send_at + timedelta(weeks=1)
+        msg.save()
+    except Exception as e:
+        logger.error(f"Scheduled update xatolik: {e}")
 
 @sync_to_async
 def save_user_to_db(user_id: int, username: str, first_name: str):
@@ -1503,6 +1744,10 @@ waiting_support  = set()
 # Rassilka uchun global event loop (Django thread pool ichidan foydalanish uchun)
 _main_loop: asyncio.AbstractEventLoop | None = None
 
+# ── Flood nazorati uchun xotira ───────────────────────────────────────
+# { user_id: deque([timestamp1, timestamp2, ...]) }
+_flood_tracker: dict[int, deque] = defaultdict(lambda: deque())
+
 # =====================================================================
 # 10. YORDAMCHI FUNKSIYALAR
 # =====================================================================
@@ -1678,15 +1923,26 @@ async def handle_user_penalty(message: types.Message, reason: str):
     count = await get_warning(user_id) + 1
     await set_warning(user_id, count)
     await increment_daily_warn()
-    if count >= 3:
+    settings = await get_bot_settings_status()
+    warn_limit = settings.get("warn_limit", 3)
+    if count >= warn_limit:
         try:
             await bot.ban_chat_member(chat_id=chat_id, user_id=user_id)
             await increment_blocked_stat()
-            await send_log(f"🚫 <b>BAN:</b> {message.from_user.first_name} ({reason})", user_id=user_id, unblock_button=True)
+            await send_log(
+                f"🚫 <b>BAN:</b> {message.from_user.first_name} ({reason})\n"
+                f"⚠️ {warn_limit} ta ogohlantirish to'ldi.",
+                user_id=user_id, unblock_button=True
+            )
             await set_warning(user_id, 0)
-        except Exception as e: logger.error(f"Ban xatolik: {e}")
+        except Exception as e:
+            logger.error(f"Ban xatolik: {e}")
     else:
-        await send_private(user_id, f"⚠️ Ogohlantirish: {count}/3. Sabab: {reason}")
+        await send_private(
+            user_id,
+            f"⚠️ Ogohlantirish: {count}/{warn_limit}. Sabab: {reason}\n"
+            f"{'⛔ Keyingisida banlanasiz!' if count == warn_limit - 1 else ''}"
+        )
 
 # =====================================================================
 # 12. CAPTCHA MANTIG'I
@@ -1915,6 +2171,161 @@ async def check_subscription(user_id: int) -> bool:
         return True
     return await user_has_started_bot(user_id)
 
+# =====================================================================
+# 13. FLOOD NAZORATI YORDAMCHI FUNKSIYA
+# =====================================================================
+async def check_flood(message: types.Message) -> bool:
+    """
+    True qaytarsa — flood aniqlandi, xabar o'chirildi va mute qilindi.
+    False qaytarsa — hamma yaxshi.
+    """
+    settings = await get_bot_settings_status()
+    if not settings.get("flood"):
+        return False
+    if await is_admin(MAIN_CHAT_ID, message.from_user.id):
+        return False
+
+    uid    = message.from_user.id
+    now    = time.time()
+    limit  = settings.get("flood_limit", 5)
+    window = settings.get("flood_window", 10)
+    mute_s = settings.get("flood_mute", 300)
+
+    dq = _flood_tracker[uid]
+    # Eski timestamp larni tozalaymiz
+    while dq and now - dq[0] > window:
+        dq.popleft()
+    dq.append(now)
+
+    if len(dq) >= limit:
+        _flood_tracker.pop(uid, None)   # reset
+        try:
+            await message.delete()
+        except Exception:
+            pass
+        until = datetime.utcnow() + timedelta(seconds=mute_s)
+        try:
+            from aiogram.types import ChatPermissions
+            await bot.restrict_chat_member(
+                chat_id=MAIN_CHAT_ID,
+                user_id=uid,
+                permissions=ChatPermissions(can_send_messages=False),
+                until_date=until,
+            )
+        except Exception as e:
+            logger.error(f"Flood mute xatolik: {e}")
+            return False
+        mins = mute_s // 60
+        try:
+            sent = await bot.send_message(
+                MAIN_CHAT_ID,
+                f"🛡 <b>{message.from_user.first_name}</b>, flood aniqlandi!\n"
+                f"⏳ <b>{mins} daqiqa</b> mute qilindi.",
+                parse_mode="HTML"
+            )
+            await asyncio.sleep(15)
+            await sent.delete()
+        except Exception:
+            pass
+        await send_log(
+            f"🛡 <b>FLOOD:</b> {message.from_user.first_name} "
+            f"(<code>{uid}</code>) — {mins} daqiqa mute."
+        )
+        return True
+    return False
+
+
+# ─────────────────────────────────────────────────────────────────────
+# NOTES BUYRUQLARI: /note, /getnote, /delnote, /notes + #kalit
+# ─────────────────────────────────────────────────────────────────────
+@dp.message(F.text.regexp(r'^/note\s+save\s+(\S+)\s+(.+)$', re.DOTALL))
+async def cmd_note_save(message: types.Message):
+    """Admin: /note save <kalit> <matn>"""
+    if not (await is_bot_admin(message.from_user.id) or
+            await is_admin(MAIN_CHAT_ID, message.from_user.id)):
+        return
+    m = re.match(r'^/note\s+save\s+(\S+)\s+(.+)$', message.text, re.DOTALL)
+    if not m:
+        return
+    keyword, text = m.group(1), m.group(2)
+    created = await save_note(keyword, text, message.from_user.id)
+    action  = "saqlandi ✅" if created else "yangilandi 🔄"
+    await message.reply(f"📝 Eslatma <b>#{keyword}</b> {action}", parse_mode="HTML")
+
+@dp.message(F.text.regexp(r'^/getnote\s+(\S+)$'))
+async def cmd_note_get(message: types.Message):
+    keyword = re.match(r'^/getnote\s+(\S+)$', message.text).group(1)
+    note = await get_note(keyword)
+    if note:
+        await message.reply(note.text, parse_mode="HTML")
+    else:
+        await message.reply(f"❌ <b>#{keyword}</b> eslatmasi topilmadi.", parse_mode="HTML")
+
+@dp.message(F.text.regexp(r'^#(\w+)$'))
+async def cmd_note_hashtag(message: types.Message):
+    """Guruhda #kalit yozilsa eslatmani chiqaradi."""
+    keyword = re.match(r'^#(\w+)$', message.text).group(1)
+    note = await get_note(keyword)
+    if note:
+        await message.reply(note.text, parse_mode="HTML")
+
+@dp.message(F.text.regexp(r'^/delnote\s+(\S+)$'))
+async def cmd_note_del(message: types.Message):
+    if not (await is_bot_admin(message.from_user.id) or
+            await is_admin(MAIN_CHAT_ID, message.from_user.id)):
+        return
+    keyword = re.match(r'^/delnote\s+(\S+)$', message.text).group(1)
+    ok = await delete_note(keyword)
+    if ok:
+        await message.reply(f"🗑 <b>#{keyword}</b> o'chirildi.", parse_mode="HTML")
+    else:
+        await message.reply(f"❌ <b>#{keyword}</b> topilmadi.", parse_mode="HTML")
+
+@dp.message(F.text == "/notes")
+async def cmd_notes_list(message: types.Message):
+    keywords = await get_all_notes()
+    if not keywords:
+        await message.reply("📭 Hozircha birorta eslatma yo'q.")
+        return
+    text = "📝 <b>Barcha eslatmalar:</b>\n\n" + "\n".join(f"• #{k}" for k in keywords)
+    await message.reply(text, parse_mode="HTML")
+
+
+# ─────────────────────────────────────────────────────────────────────
+# KENGAYTIRILGAN STATISTIKA: /stats
+# ─────────────────────────────────────────────────────────────────────
+@dp.message(F.text == "/stats")
+async def cmd_stats(message: types.Message):
+    if not (await is_bot_admin(message.from_user.id) or
+            await is_admin(MAIN_CHAT_ID, message.from_user.id)):
+        return
+    stats = await get_full_stats()
+    try:
+        chat = await bot.get_chat(MAIN_CHAT_ID)
+        member_count = await bot.get_chat_member_count(MAIN_CHAT_ID)
+    except Exception:
+        chat, member_count = None, "?"
+
+    text = (
+        "📊 <b>Kengaytirilgan Statistika</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"👥 <b>Guruh a'zolari:</b> {member_count:,}\n"
+        f"🤖 <b>Bot foydalanuvchilari:</b> {stats['users']:,}\n\n"
+        "📈 <b>Jami ko'rsatkichlar:</b>\n"
+        f"  🔗 Havola oldi: <b>{stats['links']:,}</b>\n"
+        f"  🤖 Kaptcha o'tdi: <b>{stats['captcha']:,}</b>\n"
+        f"  🚫 Ban qilindi: <b>{stats['blocked']:,}</b>\n"
+        f"  🔒 Permanent ban: <b>{stats['bans']:,}</b>\n"
+        f"  ⚠️ Ogohlantirishlar bor: <b>{stats['users_with_warns']}</b> kishi\n\n"
+        "📅 <b>Bugun:</b>\n"
+        f"  👋 Yangi a'zo: <b>{stats.get('daily_new_members', 0)}</b>\n"
+        f"  ⚠️ Ogohlantirish: <b>{stats.get('daily_warns', 0)}</b>\n"
+        f"  🚫 Bloklandi: <b>{stats.get('daily_blocked', 0)}</b>\n"
+        f"  👮 Admin qoidabuzarlik: <b>{stats.get('daily_admin', 0)}</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━"
+    )
+    await message.reply(text, parse_mode="HTML")
+
 
 @dp.message(F.chat.id == MAIN_CHAT_ID, F.text, ~F.text.startswith("/"))
 async def check_text(message: types.Message):
@@ -1962,6 +2373,21 @@ async def check_text(message: types.Message):
         message.from_user.username or ""
     )
 
+    # Flood nazorati
+    if await check_flood(message):
+        return
+
+    # Anti-link tekshiruvi
+    settings = await get_bot_settings_status()
+    if settings.get("anti_link"):
+        url_pattern = re.compile(
+            r'(https?://\S+|t\.me/\S+|@\w{4,}|www\.\S+)',
+            re.IGNORECASE
+        )
+        if url_pattern.search(message.text):
+            await handle_user_penalty(message, reason="Ruxsatsiz havola")
+            return
+
     if await check_bad_words_in_db(message.text):
         await handle_user_penalty(message, reason="So'kinish")
 
@@ -2000,6 +2426,16 @@ async def check_photo(message: types.Message):
     image_bytes = await get_thumbnail_bytes(message)
     if image_bytes and await analyze_image_async(image_bytes):
         await handle_user_penalty(message, reason="Odobsiz rasm")
+        return
+
+    # Flood nazorati
+    if await check_flood(message):
+        return
+
+    # Media filter
+    s = await get_bot_settings_status()
+    if s.get("media_filter") and not await is_admin(MAIN_CHAT_ID, message.from_user.id):
+        await handle_user_penalty(message, reason="Ruxsatsiz media (rasm)")
 
 @dp.message(F.chat.id == MAIN_CHAT_ID, F.video | F.video_note)
 async def check_video(message: types.Message):
@@ -2036,6 +2472,16 @@ async def check_video(message: types.Message):
     image_bytes = await get_thumbnail_bytes(message)
     if image_bytes and await analyze_image_async(image_bytes):
         await handle_user_penalty(message, reason="Odobsiz video")
+        return
+
+    # Flood nazorati
+    if await check_flood(message):
+        return
+
+    # Media filter
+    s = await get_bot_settings_status()
+    if s.get("media_filter") and not await is_admin(MAIN_CHAT_ID, message.from_user.id):
+        await handle_user_penalty(message, reason="Ruxsatsiz media (video)")
 
 @dp.message(F.chat.id == MAIN_CHAT_ID, F.animation)
 async def check_animation(message: types.Message):
@@ -2110,6 +2556,16 @@ async def check_sticker(message: types.Message):
     image_bytes = await get_thumbnail_bytes(message)
     if image_bytes and await analyze_image_async(image_bytes):
         await handle_user_penalty(message, reason="Odobsiz stiker")
+        return
+
+    # Flood nazorati
+    if await check_flood(message):
+        return
+
+    # Media filter
+    s = await get_bot_settings_status()
+    if s.get("media_filter") and not await is_admin(MAIN_CHAT_ID, message.from_user.id):
+        await handle_user_penalty(message, reason="Ruxsatsiz media (stiker)")
 
 # ─────────────────────────────────────────────────────────────────────
 # /id komandasi moderator.py (MOD) orqali boshqariladi
@@ -2138,12 +2594,18 @@ async def _build_panel(user_id: int):
         f"🚫 Bot blok qildi: <b>{stats['blocked']:,}</b>\n"
         f"🔒 Permanent ban: <b>{stats['bans']:,}</b>\n"
         f"⚠️ Ogohlantirishlar: <b>{stats['users_with_warns']}</b> ta foydalanuvchi\n\n"
-        "⚙️ <b>Sozlamalar:</b>\n"
-        f"{bi(settings['captcha'])} Kaptcha tekshiruvi\n"
-        f"{bi(settings['link'])} Havola olish\n"
-        f"{bi(settings['join_request'])} Arizalarni qabul qilish\n"
-        f"{bi(settings['subscription'])} /start tekshiruvi\n"
-        f"{bi(settings['admin_rules'])} Adminlarga ham qoidalar\n"
+        "⚙️ <b>Asosiy sozlamalar:</b>\n"
+        f"{bi(settings['captcha'])} Kaptcha  "
+        f"{bi(settings['link'])} Havola  "
+        f"{bi(settings['join_request'])} Ariza\n"
+        f"{bi(settings['subscription'])} /Start  "
+        f"{bi(settings['admin_rules'])} Admin qoidalari\n\n"
+        "🛡 <b>Xavfsizlik:</b>\n"
+        f"{bi(settings['flood'])} Flood nazorati  "
+        f"{bi(settings['anti_link'])} Anti-link\n"
+        f"{bi(settings['welcome'])} Xush kelibsiz  "
+        f"{bi(settings['media_filter'])} Media filter\n"
+        f"⚠️ Warn limiti: <b>{settings.get('warn_limit', 3)}</b> ta\n"
         "━━━━━━━━━━━━━━━━━━━━"
     )
     markup = InlineKeyboardMarkup(inline_keyboard=[
@@ -2156,10 +2618,18 @@ async def _build_panel(user_id: int):
             tog_btn("jrq", settings['join_request'], "Ariza"),
             tog_btn("sub", settings['subscription'], "/Start"),
         ],
-        [tog_btn("adm", settings['admin_rules'], "Admin qoidalari")],
+        [tog_btn("adm", settings['admin_rules'],     "Admin qoidalari")],
         [
-            InlineKeyboardButton(text="👑 Adminlar",        callback_data="pnl_adm"),
-            InlineKeyboardButton(text="🚫 Banlar",          callback_data="pnl_ban"),
+            tog_btn("fld", settings['flood'],        "🛡 Flood"),
+            tog_btn("alk", settings['anti_link'],    "🔗 Anti-link"),
+        ],
+        [
+            tog_btn("wlc", settings['welcome'],      "👋 Xush kelibsiz"),
+            tog_btn("mfl", settings['media_filter'], "🚫 Media filter"),
+        ],
+        [
+            InlineKeyboardButton(text="👑 Adminlar",         callback_data="pnl_adm"),
+            InlineKeyboardButton(text="🚫 Banlar",           callback_data="pnl_ban"),
         ],
         [
             InlineKeyboardButton(text="⚠️ Ogohlantirishlar", callback_data="pnl_wrn"),
@@ -2198,6 +2668,10 @@ _FIELD_MAP = {
     "jrq": "is_join_request_active",
     "sub": "is_subscription_active",
     "adm": "admin_rules_active",
+    "fld": "is_flood_active",
+    "alk": "is_anti_link",
+    "wlc": "is_welcome_active",
+    "mfl": "is_media_filter_active",
 }
 
 @dp.callback_query(F.data.startswith("pnl_"))
@@ -2229,9 +2703,11 @@ async def pnl_callback_handler(callback: CallbackQuery):
             return await callback.answer("❓ Noma'lum sozlama", show_alert=True)
         new_val = await toggle_bot_setting(field)
         label_map = {
-            "cap": "Kaptcha",   "lnk": "Havola",
-            "jrq": "Ariza",     "sub": "/Start tekshiruvi",
-            "adm": "Admin qoidalari",
+            "cap": "Kaptcha",          "lnk": "Havola",
+            "jrq": "Ariza",            "sub": "/Start tekshiruvi",
+            "adm": "Admin qoidalari",  "fld": "🛡 Flood nazorati",
+            "alk": "🔗 Anti-link",     "wlc": "👋 Xush kelibsiz",
+            "mfl": "🚫 Media filter",
         }
         lbl = label_map.get(code, code)
         await callback.answer(
@@ -2443,6 +2919,40 @@ async def on_chat_member_update(update: types.ChatMemberUpdated):
     )
     if just_joined:
         await increment_daily_new_member()
+        settings = await get_bot_settings_status()
+
+        # ── Guruhda welcome xabari ──────────────────────────────────
+        if settings.get("welcome"):
+            try:
+                member_count = await bot.get_chat_member_count(MAIN_CHAT_ID)
+            except Exception:
+                member_count = "?"
+            uname = f"@{user.username}" if user.username else user_name
+            welcome_tpl = settings.get(
+                "welcome_text",
+                "👋 Salom, {name}! Guruhga xush kelibsiz! 🎉"
+            )
+            welcome_msg = welcome_tpl.format(
+                name=user_name,
+                username=uname,
+                count=member_count,
+            )
+            try:
+                sent = await bot.send_message(
+                    MAIN_CHAT_ID,
+                    welcome_msg,
+                    parse_mode="HTML"
+                )
+                # 5 daqiqadan keyin o'chir
+                await asyncio.sleep(300)
+                try:
+                    await sent.delete()
+                except Exception:
+                    pass
+            except Exception as e:
+                logger.error(f"Welcome xabar xatolik: {e}")
+
+        # ── Private ga qoidalar ─────────────────────────────────────
         rules_text = await get_active_rules()
         if rules_text:
             greeting = (
@@ -2618,8 +3128,36 @@ async def main():
 
     await asyncio.gather(
         dp.start_polling(bot, allowed_updates=["message", "callback_query", "chat_join_request", "chat_member", "my_chat_member"]),
-        run_django_web_server()
+        run_django_web_server(),
+        scheduled_messages_loop(),
     )
+
+
+# ─────────────────────────────────────────────────────────────────────
+# REJALASHTIRILGAN XABARLAR LOOP
+# ─────────────────────────────────────────────────────────────────────
+async def scheduled_messages_loop():
+    """Har 60 soniyada rejalashtirilgan xabarlarni tekshiradi va yuboradi."""
+    await asyncio.sleep(10)
+    logger.info("⏰ Rejalashtirilgan xabarlar loopi boshlandi.")
+    while True:
+        try:
+            msgs = await get_scheduled_messages_to_send()
+            for msg in msgs:
+                try:
+                    await bot.send_message(
+                        MAIN_CHAT_ID,
+                        msg.text,
+                        parse_mode="HTML"
+                    )
+                    await update_scheduled_after_send(msg.pk, msg.repeat)
+                    logger.info(f"⏰ Rejalashtirilgan xabar yuborildi: {msg.title}")
+                except Exception as e:
+                    logger.error(f"Scheduled xabar yuborishda xatolik: {e}")
+        except Exception as e:
+            logger.error(f"Scheduled loop xatolik: {e}")
+        await asyncio.sleep(60)
+
 
 if __name__ == "__main__":
     asyncio.run(main())
