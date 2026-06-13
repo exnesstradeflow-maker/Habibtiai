@@ -1601,7 +1601,7 @@ def get_all_notes():
 @sync_to_async
 def get_scheduled_messages_to_send():
     """Hozir yuborilishi kerak bo'lgan faol xabarlarni qaytaradi."""
-    now = datetime.utcnow()
+    now = _tz_now()
     msgs = list(ScheduledMessage.objects.filter(is_active=True, send_at__lte=now))
     return msgs
 
@@ -1610,7 +1610,7 @@ def update_scheduled_after_send(msg_id: int, repeat: str):
     """Xabar yuborilgandan keyin send_at ni yangilaydi yoki o'chiradi."""
     try:
         msg = ScheduledMessage.objects.get(pk=msg_id)
-        msg.last_sent = datetime.utcnow()
+        msg.last_sent = _tz_now()
         if repeat == 'once':
             msg.is_active = False
         elif repeat == 'hourly':
@@ -2342,7 +2342,7 @@ async def check_flood(message: types.Message) -> bool:
             await message.delete()
         except Exception:
             pass
-        until = datetime.utcnow() + timedelta(seconds=mute_s)
+        until = _tz_now() + timedelta(seconds=mute_s)
         try:
             from aiogram.types import ChatPermissions
             await bot.restrict_chat_member(
