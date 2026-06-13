@@ -1,0 +1,238 @@
+{% load i18n static %}
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kirish — ⚜ Habibti Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+{% block extrastyle %}{% endblock %}
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  height: 100%;
+  background: #0b1120;
+  color: #e8edf5;
+  font-family: 'Inter', sans-serif;
+}
+
+/* BG grid */
+body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: 0;
+  background-image:
+    linear-gradient(rgba(124,58,237,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(124,58,237,0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+  pointer-events: none;
+}
+
+/* Glow blobs */
+body::after {
+  content: '';
+  position: fixed;
+  top: -200px; left: 50%; transform: translateX(-50%);
+  width: 600px; height: 600px;
+  background: radial-gradient(circle, rgba(124,58,237,0.12) 0%, transparent 70%);
+  pointer-events: none; z-index: 0;
+}
+
+.login-wrap {
+  position: relative; z-index: 1;
+  min-height: 100vh;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+
+.login-card {
+  width: 100%; max-width: 400px;
+  background: #111d35;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 18px;
+  padding: 36px 32px;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+  animation: fadeup 0.5s ease both;
+}
+@keyframes fadeup {
+  from { opacity:0; transform: translateY(18px); }
+  to   { opacity:1; transform: translateY(0); }
+}
+
+/* Logo */
+.login-logo {
+  display: flex; align-items: center; gap: 13px;
+  margin-bottom: 28px; justify-content: center;
+}
+.login-logo-icon {
+  width: 46px; height: 46px; border-radius: 13px;
+  background: linear-gradient(135deg, #7C3AED, #06B6D4);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 6px 20px rgba(124,58,237,0.4);
+}
+.login-logo-icon i { color: #fff; font-size: 24px; }
+.login-logo-text h1 {
+  font-family: 'Syne', sans-serif;
+  font-weight: 800; font-size: 22px;
+  background: linear-gradient(90deg, #a78bfa, #67e8f9);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.login-logo-text p {
+  font-size: 10px; color: rgba(255,255,255,0.3);
+  letter-spacing: 2px; text-transform: uppercase; margin-top: 2px;
+}
+
+/* Error */
+.login-error {
+  background: rgba(239,68,68,0.14);
+  border: 1px solid rgba(239,68,68,0.25);
+  border-radius: 9px; padding: 11px 14px;
+  color: #f87171; font-size: 13px;
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 16px;
+}
+.login-error i { font-size: 16px; flex-shrink: 0; }
+
+/* Form */
+.login-form { display: flex; flex-direction: column; gap: 14px; }
+.form-group { display: flex; flex-direction: column; gap: 6px; }
+.form-group label {
+  font-size: 12px; font-weight: 500;
+  color: rgba(232,237,245,0.55);
+  text-transform: uppercase; letter-spacing: 0.8px;
+}
+.input-wrap {
+  position: relative; display: flex; align-items: center;
+}
+.input-wrap i {
+  position: absolute; left: 12px;
+  color: rgba(255,255,255,0.25); font-size: 17px;
+  pointer-events: none;
+}
+.input-wrap input {
+  width: 100%; padding: 11px 14px 11px 40px;
+  background: #152040; border: 1px solid rgba(255,255,255,0.1);
+  color: #e8edf5; border-radius: 9px;
+  font-size: 14px; font-family: 'Inter', sans-serif;
+  outline: none; transition: all 0.18s ease;
+}
+.input-wrap input:focus {
+  border-color: #7C3AED;
+  box-shadow: 0 0 0 3px rgba(124,58,237,0.18);
+  background: #1a2650;
+}
+.input-wrap input::placeholder { color: rgba(255,255,255,0.22); }
+
+/* Toggle password */
+.toggle-pw {
+  position: absolute; right: 12px;
+  background: none; border: none; cursor: pointer;
+  color: rgba(255,255,255,0.3); font-size: 17px;
+  transition: color 0.15s;
+}
+.toggle-pw:hover { color: rgba(255,255,255,0.6); }
+
+/* Submit */
+.login-submit {
+  width: 100%; padding: 12px;
+  background: linear-gradient(135deg, #7C3AED, #9333ea);
+  color: #fff; border: none; border-radius: 9px;
+  font-size: 14px; font-weight: 600;
+  font-family: 'Inter', sans-serif;
+  cursor: pointer; transition: all 0.18s ease;
+  margin-top: 4px;
+  box-shadow: 0 4px 16px rgba(124,58,237,0.35);
+}
+.login-submit:hover {
+  box-shadow: 0 6px 24px rgba(124,58,237,0.5);
+  transform: translateY(-1px);
+}
+.login-submit:active { transform: translateY(0); }
+
+/* Footer */
+.login-footer {
+  text-align: center; margin-top: 20px;
+  font-size: 12px; color: rgba(255,255,255,0.2);
+}
+</style>
+</head>
+<body>
+<div class="login-wrap">
+  <div class="login-card">
+
+    <div class="login-logo">
+      <div class="login-logo-icon"><i class="ti ti-robot"></i></div>
+      <div class="login-logo-text">
+        <h1>Habibti</h1>
+        <p>Admin Panel</p>
+      </div>
+    </div>
+
+    {% if form.errors %}
+    <div class="login-error">
+      <i class="ti ti-alert-circle"></i>
+      <span>Login yoki parol noto'g'ri. Qayta urinib ko'ring.</span>
+    </div>
+    {% endif %}
+
+    {% if messages %}
+      {% for message in messages %}
+      <div class="login-error" style="background:rgba(249,115,22,0.14);border-color:rgba(249,115,22,0.25);color:#fb923c;">
+        <i class="ti ti-info-circle"></i>
+        <span>{{ message }}</span>
+      </div>
+      {% endfor %}
+    {% endif %}
+
+    <form class="login-form" method="post" action="{{ app_path }}">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ next }}">
+
+      <div class="form-group">
+        <label for="id_username">{% trans "Username" %}</label>
+        <div class="input-wrap">
+          <i class="ti ti-user"></i>
+          <input type="text" id="id_username" name="username"
+            value="{{ form.username.value|default:'' }}"
+            placeholder="Username kiriting" autofocus autocomplete="username">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="id_password">{% trans "Password" %}</label>
+        <div class="input-wrap">
+          <i class="ti ti-lock"></i>
+          <input type="password" id="id_password" name="password"
+            placeholder="Parol kiriting" autocomplete="current-password">
+          <button type="button" class="toggle-pw" onclick="togglePw()">
+            <i class="ti ti-eye" id="pw-eye"></i>
+          </button>
+        </div>
+      </div>
+
+      <button type="submit" class="login-submit">
+        {% trans "Kirish" %}
+      </button>
+    </form>
+
+    <div class="login-footer">⚜ Habibti Admin Panel © 2025</div>
+  </div>
+</div>
+
+<script>
+function togglePw() {
+  const inp = document.getElementById('id_password');
+  const ico = document.getElementById('pw-eye');
+  if (inp.type === 'password') {
+    inp.type = 'text';
+    ico.className = 'ti ti-eye-off';
+  } else {
+    inp.type = 'password';
+    ico.className = 'ti ti-eye';
+  }
+}
+</script>
+{% block extrascript %}{% endblock %}
+</body>
+</html>
