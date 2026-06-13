@@ -1,0 +1,696 @@
+{% load i18n static %}
+<!DOCTYPE html>
+<html lang="uz" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="NONE,NOARCHIVE">
+<title>{% block title %}{% endblock %} — ⚜ Habibti Admin</title>
+
+{# Django admin required #}
+{% block extrahead %}{% endblock %}
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+
+<style>
+/* ═══════════════════════════════════════════════════
+   TOKENS
+═══════════════════════════════════════════════════ */
+:root {
+  --bg:         #0b1120;
+  --bg2:        #0f1729;
+  --card:       #111d35;
+  --card2:      #152040;
+  --border:     rgba(255,255,255,0.07);
+  --border2:    rgba(255,255,255,0.13);
+
+  --purple:     #7C3AED;
+  --purp-l:     #a78bfa;
+  --purp-dim:   rgba(124,58,237,0.18);
+  --cyan:       #06B6D4;
+  --cyan-l:     #67e8f9;
+  --cyan-dim:   rgba(6,182,212,0.15);
+  --orange:     #F97316;
+  --ora-l:      #fb923c;
+  --ora-dim:    rgba(249,115,22,0.15);
+  --green:      #10b981;
+  --grn-l:      #34d399;
+  --grn-dim:    rgba(16,185,129,0.14);
+  --red:        #ef4444;
+  --red-dim:    rgba(239,68,68,0.14);
+
+  --txt:        #e8edf5;
+  --txt2:       rgba(232,237,245,0.58);
+  --txt3:       rgba(232,237,245,0.30);
+
+  --font-d:     'Syne', sans-serif;
+  --font-b:     'Inter', sans-serif;
+  --r:          11px;
+  --rsm:        7px;
+  --tr:         0.18s cubic-bezier(0.4,0,0.2,1);
+  --sw:         228px;
+}
+
+/* ── RESET ─────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; background: var(--bg); color: var(--txt); }
+body { font-family: var(--font-b); font-size: 14px; line-height: 1.5; }
+a { color: var(--purp-l); text-decoration: none; transition: color var(--tr); }
+a:hover { color: var(--cyan); }
+img { max-width: 100%; }
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); }
+
+/* ── LAYOUT ────────────────────────────────────── */
+.h-layout { display: flex; min-height: 100vh; }
+
+/* ═══════════════════════════════════════════════════
+   SIDEBAR
+═══════════════════════════════════════════════════ */
+.h-sidebar {
+  width: var(--sw);
+  background: var(--card);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  transition: width var(--tr);
+}
+
+/* Logo */
+.h-logo {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 20px 16px;
+  border-bottom: 1px solid var(--border);
+  text-decoration: none;
+  flex-shrink: 0;
+}
+.h-logo-icon {
+  width: 36px; height: 36px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--purple), var(--cyan));
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 4px 14px rgba(124,58,237,0.35);
+}
+.h-logo-icon i { color: #fff; font-size: 19px; }
+.h-logo-text { line-height: 1.15; }
+.h-logo-name {
+  font-family: var(--font-d);
+  font-weight: 800; font-size: 16px;
+  background: linear-gradient(90deg, var(--purp-l), var(--cyan));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.h-logo-sub {
+  font-size: 9px; letter-spacing: 2px;
+  text-transform: uppercase; color: var(--txt3);
+}
+
+/* Nav */
+.h-nav { padding: 10px 10px 10px; flex: 1; overflow-y: auto; }
+
+.h-nav-section {
+  font-size: 9px; letter-spacing: 2px;
+  text-transform: uppercase; color: var(--txt3);
+  padding: 0 8px; margin: 16px 0 5px;
+}
+.h-nav-section:first-child { margin-top: 4px; }
+
+.h-nav-item {
+  display: flex; align-items: center; gap: 9px;
+  padding: 9px 10px; border-radius: var(--rsm);
+  color: var(--txt2); font-size: 13px;
+  cursor: pointer; transition: all var(--tr);
+  margin-bottom: 2px; position: relative;
+  text-decoration: none; user-select: none;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.h-nav-item:hover { background: rgba(255,255,255,0.055); color: var(--txt); }
+.h-nav-item.active {
+  background: linear-gradient(135deg,rgba(124,58,237,0.28),rgba(6,182,212,0.12));
+  color: #fff;
+}
+.h-nav-item.active::before {
+  content: '';
+  position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+  width: 3px; height: 18px; border-radius: 0 3px 3px 0;
+  background: linear-gradient(180deg, var(--purple), var(--cyan));
+}
+.h-nav-item i { font-size: 16px; width: 19px; text-align: center; flex-shrink: 0; }
+.h-nav-item.active i { color: var(--purp-l); }
+.h-nav-item span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
+/* Bot status */
+.h-bot-status {
+  margin: 10px; padding: 11px 12px;
+  background: var(--grn-dim); border: 1px solid rgba(16,185,129,0.2);
+  border-radius: var(--r); display: flex; align-items: center; gap: 10px;
+  flex-shrink: 0;
+}
+.h-bot-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--green); flex-shrink: 0;
+  animation: pulse-g 2.2s infinite;
+}
+@keyframes pulse-g {
+  0%,100% { box-shadow: 0 0 0 0 rgba(16,185,129,0.5); }
+  50%      { box-shadow: 0 0 0 5px rgba(16,185,129,0); }
+}
+.h-bot-lbl { font-size: 11px; font-weight: 600; color: var(--grn-l); }
+.h-bot-sub { font-size: 10px; color: var(--txt3); margin-top: 1px; }
+
+/* ═══════════════════════════════════════════════════
+   MAIN
+═══════════════════════════════════════════════════ */
+.h-main { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg2); }
+
+/* TOPBAR */
+.h-topbar {
+  position: sticky; top: 0; z-index: 200;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 24px;
+  background: rgba(11,17,32,0.85);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--border);
+}
+.h-breadcrumb { display: flex; align-items: center; gap: 6px; }
+.h-breadcrumb a { font-size: 13px; color: var(--txt3); }
+.h-breadcrumb a:hover { color: var(--txt2); }
+.h-breadcrumb-sep { color: var(--txt3); font-size: 12px; }
+.h-breadcrumb-cur { font-family: var(--font-d); font-weight: 700; font-size: 14px; color: var(--txt); }
+
+.h-topbar-right { display: flex; align-items: center; gap: 8px; }
+.h-icon-btn {
+  width: 34px; height: 34px; border-radius: var(--rsm);
+  background: rgba(255,255,255,0.05); border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: all var(--tr); position: relative;
+  text-decoration: none;
+}
+.h-icon-btn:hover { background: rgba(255,255,255,0.09); border-color: var(--border2); }
+.h-icon-btn i { color: var(--txt2); font-size: 16px; }
+.h-icon-btn .h-dot {
+  position: absolute; top: 6px; right: 6px;
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--orange); border: 1.5px solid var(--bg2);
+}
+.h-user-btn {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 12px 5px 5px;
+  background: rgba(255,255,255,0.05); border: 1px solid var(--border);
+  border-radius: var(--rsm); cursor: pointer; transition: all var(--tr);
+  text-decoration: none;
+}
+.h-user-btn:hover { background: rgba(255,255,255,0.09); }
+.h-user-ava {
+  width: 26px; height: 26px; border-radius: 6px;
+  background: linear-gradient(135deg, var(--purple), var(--cyan));
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-d); font-weight: 700; font-size: 10px; color: #fff;
+}
+.h-user-name { font-size: 13px; font-weight: 500; color: var(--txt); }
+.h-user-role { font-size: 10px; color: var(--txt3); }
+
+/* CONTENT */
+.h-content { flex: 1; padding: 22px 24px; overflow-y: auto; min-width: 0; }
+
+/* ═══════════════════════════════════════════════════
+   DJANGO ADMIN ELEMENTS — RESTYLED
+═══════════════════════════════════════════════════ */
+
+/* Messages */
+.messagelist { list-style: none; margin-bottom: 18px; display: flex; flex-direction: column; gap: 8px; }
+.messagelist li {
+  padding: 11px 16px; border-radius: var(--r);
+  font-size: 13px; font-weight: 500;
+  display: flex; align-items: center; gap: 8px;
+  animation: fadeUp 0.3s ease both;
+}
+@keyframes fadeUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
+.messagelist li::before { font-family: "tabler-icons"; font-size: 16px; }
+.messagelist .success { background: var(--grn-dim); color: var(--grn-l); border: 1px solid rgba(16,185,129,0.2); }
+.messagelist .success::before { content: "\eb6b"; }
+.messagelist .error   { background: var(--red-dim);  color: #f87171; border: 1px solid rgba(239,68,68,0.2); }
+.messagelist .error::before   { content: "\ea4d"; }
+.messagelist .warning { background: var(--ora-dim);  color: var(--ora-l); border: 1px solid rgba(249,115,22,0.2); }
+.messagelist .warning::before { content: "\ea06"; }
+.messagelist .info    { background: var(--cyan-dim); color: var(--cyan); border: 1px solid rgba(6,182,212,0.2); }
+.messagelist .info::before    { content: "\ea77"; }
+
+/* Page title */
+#content > h1, #content-main > h1, .h-content > h1 {
+  font-family: var(--font-d); font-weight: 700; font-size: 20px;
+  color: var(--txt); margin-bottom: 18px;
+}
+
+/* Object tools */
+.object-tools { float: right; margin: 0 0 16px; list-style: none; display: flex; gap: 8px; }
+.object-tools li a, .object-tools a {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 16px; border-radius: var(--rsm); font-size: 12.5px; font-weight: 500;
+  background: linear-gradient(135deg, var(--purple), #9333ea);
+  color: #fff !important; text-decoration: none;
+  transition: all var(--tr);
+  box-shadow: 0 3px 12px rgba(124,58,237,0.3);
+}
+.object-tools li a:hover, .object-tools a:hover {
+  box-shadow: 0 5px 20px rgba(124,58,237,0.45); transform: translateY(-1px);
+}
+
+/* ── TABLE ─────────────────────────────────────── */
+#result_list, .results table {
+  width: 100%; border-collapse: collapse;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--r); overflow: hidden;
+}
+#result_list thead th,
+.results table thead th {
+  background: var(--card2); padding: 12px 14px;
+  text-align: left; font-size: 10px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 1.2px; color: var(--txt3);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+#result_list thead th a,
+.results table thead th a { color: var(--txt3); }
+#result_list thead th.sorted a,
+.results table thead th.sorted a { color: var(--purp-l); }
+#result_list tbody tr, .results table tbody tr { transition: background var(--tr); }
+#result_list tbody tr:hover, .results table tbody tr:hover { background: rgba(255,255,255,0.04); }
+#result_list tbody tr:nth-child(even) { background: rgba(255,255,255,0.015); }
+#result_list tbody tr:nth-child(even):hover { background: rgba(255,255,255,0.04); }
+#result_list tbody td, .results table tbody td {
+  padding: 11px 14px; border-top: 1px solid var(--border);
+  color: var(--txt2); font-size: 13px; vertical-align: middle;
+}
+#result_list tbody td a { color: var(--purp-l); }
+#result_list tbody td a:hover { color: var(--cyan); }
+#result_list tbody td.action-checkbox { width: 24px; }
+
+/* Checkboxes */
+input[type="checkbox"] {
+  accent-color: var(--purple);
+  width: 15px; height: 15px; cursor: pointer;
+}
+
+/* ── ACTIONS BAR ────────────────────────────────── */
+.actions {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; margin-bottom: 14px;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--r);
+}
+.actions label { font-size: 13px; color: var(--txt2); }
+.actions select {
+  background: var(--card2); border: 1px solid var(--border2);
+  color: var(--txt); padding: 6px 10px; border-radius: var(--rsm);
+  font-size: 13px; font-family: var(--font-b); cursor: pointer;
+  transition: border-color var(--tr); outline: none;
+}
+.actions select:focus { border-color: var(--purple); }
+.actions button, .actions .button {
+  padding: 7px 14px; border-radius: var(--rsm);
+  background: var(--purp-dim); color: var(--purp-l);
+  border: 1px solid rgba(124,58,237,0.3); font-size: 12.5px;
+  font-weight: 500; cursor: pointer; transition: all var(--tr);
+  font-family: var(--font-b);
+}
+.actions button:hover { background: var(--purple); color: #fff; }
+
+/* ── SEARCH BAR ─────────────────────────────────── */
+#searchbar, #toolbar { margin-bottom: 14px; }
+#searchbar form, #toolbar form { display: flex; gap: 8px; align-items: center; }
+#searchbar input[type="text"], #toolbar input[type="text"] {
+  background: var(--card); border: 1px solid var(--border);
+  color: var(--txt); padding: 9px 14px; border-radius: var(--rsm);
+  font-size: 13px; font-family: var(--font-b);
+  flex: 1; max-width: 340px; outline: none; transition: border-color var(--tr);
+}
+#searchbar input:focus, #toolbar input:focus { border-color: var(--purple); }
+#searchbar input[type="submit"], #toolbar input[type="submit"] {
+  background: var(--purp-dim); color: var(--purp-l);
+  border: 1px solid rgba(124,58,237,0.3); padding: 9px 16px;
+  border-radius: var(--rsm); cursor: pointer; font-size: 13px;
+  font-family: var(--font-b); transition: all var(--tr);
+}
+#searchbar input[type="submit"]:hover { background: var(--purple); color: #fff; }
+
+/* ── PAGINATION ─────────────────────────────────── */
+.pagination {
+  display: flex; align-items: center; gap: 4px;
+  padding: 14px 0; flex-wrap: wrap;
+}
+.pagination a, .pagination .this-page {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 32px; height: 32px; padding: 0 8px;
+  border-radius: var(--rsm); font-size: 13px; font-weight: 500;
+  transition: all var(--tr);
+}
+.pagination a {
+  background: var(--card); border: 1px solid var(--border);
+  color: var(--txt2); text-decoration: none;
+}
+.pagination a:hover { background: var(--card2); border-color: var(--border2); color: var(--txt); }
+.pagination .this-page {
+  background: var(--purple); color: #fff; border: 1px solid var(--purple);
+}
+.paginator { color: var(--txt3); font-size: 13px; }
+
+/* ── CHANGE FORM ────────────────────────────────── */
+.module, fieldset.module {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--r); margin-bottom: 16px; overflow: hidden;
+}
+.module h2, fieldset.module h2 {
+  background: var(--card2); padding: 12px 16px;
+  font-family: var(--font-d); font-size: 13px; font-weight: 700;
+  color: var(--txt); border-bottom: 1px solid var(--border);
+}
+.form-row, .module .form-row {
+  padding: 13px 16px; border-top: 1px solid var(--border);
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start;
+}
+.form-row:first-of-type { border-top: none; }
+.form-row label {
+  font-size: 12.5px; font-weight: 500; color: var(--txt2);
+  min-width: 200px; padding-top: 8px;
+}
+.form-row .help {
+  font-size: 11px; color: var(--txt3); margin-top: 4px; display: block;
+}
+.required label::after { content: ' *'; color: var(--orange); }
+.errors, .errorlist {
+  background: var(--red-dim); border: 1px solid rgba(239,68,68,0.25);
+  border-radius: var(--rsm); padding: 8px 12px; margin-bottom: 12px;
+  color: #f87171; font-size: 13px; list-style: none;
+}
+
+/* Inputs */
+input[type="text"], input[type="password"], input[type="email"],
+input[type="number"], input[type="url"], input[type="tel"],
+input[type="date"], input[type="datetime-local"], input[type="time"],
+textarea, select, .vTextField {
+  background: var(--card2) !important;
+  border: 1px solid var(--border2) !important;
+  color: var(--txt) !important; border-radius: var(--rsm) !important;
+  padding: 9px 12px !important; font-size: 13px !important;
+  font-family: var(--font-b) !important; outline: none !important;
+  transition: border-color var(--tr) !important; width: 100% !important;
+  max-width: 600px;
+}
+input:focus, textarea:focus, select:focus {
+  border-color: var(--purple) !important;
+  box-shadow: 0 0 0 3px rgba(124,58,237,0.15) !important;
+}
+select option { background: var(--card2); color: var(--txt); }
+textarea { min-height: 90px; resize: vertical; }
+
+/* Submit buttons */
+.submit-row {
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+  padding: 14px 16px; background: var(--card);
+  border: 1px solid var(--border); border-radius: var(--r);
+  margin-top: 16px;
+}
+.submit-row input[type="submit"], .submit-row a, .default {
+  padding: 9px 20px; border-radius: var(--rsm);
+  font-size: 13px; font-weight: 500; cursor: pointer;
+  font-family: var(--font-b); transition: all var(--tr); text-decoration: none;
+  border: none !important; display: inline-flex; align-items: center;
+}
+input[type="submit"].default, .submit-row input[name="_save"] {
+  background: linear-gradient(135deg, var(--purple), #9333ea) !important;
+  color: #fff !important;
+  box-shadow: 0 3px 12px rgba(124,58,237,0.3);
+}
+input[type="submit"].default:hover, .submit-row input[name="_save"]:hover {
+  box-shadow: 0 5px 20px rgba(124,58,237,0.45) !important;
+  transform: translateY(-1px);
+}
+.submit-row input[name="_addanother"] {
+  background: var(--card2) !important; color: var(--txt2) !important;
+  border: 1px solid var(--border2) !important;
+}
+.submit-row input[name="_addanother"]:hover { border-color: var(--purple) !important; color: var(--txt) !important; }
+.submit-row a.deletelink {
+  color: #f87171 !important; background: var(--red-dim) !important;
+  border: 1px solid rgba(239,68,68,0.25) !important; margin-left: auto;
+}
+.submit-row a.deletelink:hover { background: rgba(239,68,68,0.25) !important; }
+
+/* Inline admin */
+.inline-group { margin-top: 16px; }
+.inline-group h2 {
+  font-family: var(--font-d); font-size: 13px; font-weight: 700;
+  color: var(--txt); padding: 12px 16px;
+  background: var(--card2); border: 1px solid var(--border);
+  border-radius: var(--r) var(--r) 0 0;
+  border-bottom: none;
+}
+.inline-related {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 0 0 var(--r) var(--r); padding: 14px;
+}
+
+/* ── FILTERS SIDEBAR ────────────────────────────── */
+#changelist-filter {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--r); padding: 16px;
+  min-width: 200px; max-width: 220px;
+}
+#changelist-filter h2 {
+  font-family: var(--font-d); font-size: 12px; font-weight: 700;
+  color: var(--txt3); text-transform: uppercase; letter-spacing: 1.5px;
+  margin-bottom: 12px;
+}
+#changelist-filter h3 {
+  font-size: 11px; font-weight: 600; color: var(--txt2);
+  text-transform: uppercase; letter-spacing: 1px;
+  margin: 12px 0 6px; padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+#changelist-filter ul { list-style: none; }
+#changelist-filter li { margin-bottom: 3px; }
+#changelist-filter a {
+  display: block; padding: 6px 8px; border-radius: var(--rsm);
+  font-size: 12.5px; color: var(--txt2); transition: all var(--tr);
+}
+#changelist-filter a:hover { background: rgba(255,255,255,0.05); color: var(--txt); }
+#changelist-filter .selected a {
+  background: var(--purp-dim); color: var(--purp-l); font-weight: 500;
+}
+
+/* Changelist with filter layout */
+#changelist { display: flex; gap: 14px; align-items: flex-start; }
+#changelist-form { flex: 1; min-width: 0; }
+
+/* ── DATE PICKER OVERRIDE ───────────────────────── */
+.calendarbox, .clockbox {
+  background: var(--card) !important; border: 1px solid var(--border2) !important;
+  border-radius: var(--r) !important; box-shadow: 0 8px 32px rgba(0,0,0,0.4) !important;
+}
+.calendar caption, .calendar th {
+  background: var(--card2) !important; color: var(--txt) !important;
+}
+.calendar td a { color: var(--txt) !important; }
+.calendar td a:hover, .calendar td.today a {
+  background: var(--purple) !important; color: #fff !important; border-radius: 4px;
+}
+.calendar-shortcuts a { color: var(--purp-l) !important; }
+
+/* ── BREADCRUMBS (from child templates) ─────────── */
+.h-bc { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.h-bc a { font-size: 12px; color: var(--txt3); }
+.h-bc a:hover { color: var(--txt2); }
+.h-bc-sep { color: var(--txt3); font-size: 11px; }
+.h-bc-cur { font-size: 12px; color: var(--txt2); }
+
+/* ── MISC ───────────────────────────────────────── */
+.help-block, p.help { font-size: 11px; color: var(--txt3); margin-top: 4px; }
+.deletelink { color: #f87171 !important; }
+.deletelink:hover { color: var(--red) !important; }
+.addlink { color: var(--grn-l) !important; }
+.changelink, .viewlink { color: var(--purp-l) !important; }
+
+/* readonly */
+.readonly, .field-box.readonly { color: var(--txt2); padding: 9px 0; }
+p.datetime { display: flex; gap: 8px; color: var(--txt2); font-size: 13px; }
+
+/* Related widget */
+.related-widget-wrapper { display: flex; align-items: center; gap: 8px; }
+.related-widget-wrapper select { flex: 1; }
+
+/* Description boxes (fieldset description) */
+.description, fieldset .description, .module .description {
+  background: rgba(124,58,237,0.07);
+  border-left: 3px solid var(--purple);
+  padding: 10px 14px; border-radius: 0 var(--rsm) var(--rsm) 0;
+  font-size: 12.5px; color: var(--txt2); margin: 10px 16px;
+}
+.description p { color: var(--txt2); font-size: 12.5px; margin: 0; }
+
+/* ── RESPONSIVE ─────────────────────────────────── */
+@media (max-width: 900px) {
+  .h-sidebar { width: 52px; }
+  .h-logo-text, .h-nav-item span, .h-nav-section,
+  .h-bot-status .h-bot-lbl, .h-bot-status .h-bot-sub { display: none; }
+  .h-logo { justify-content: center; padding: 16px; }
+  .h-nav-item { justify-content: center; padding: 10px; }
+  .h-nav-item::before { display: none; }
+  .h-content { padding: 14px; }
+  #changelist { flex-direction: column; }
+  #changelist-filter { max-width: 100%; width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) { *, .h-bot-dot { animation: none !important; transition: none !important; } }
+</style>
+
+{# Extra styles from child templates #}
+{% block extrastyle %}{% endblock %}
+</head>
+
+<body class="{% block bodyclass %}{% endblock %}">
+
+{# Popup window — minimal layout #}
+{% if is_popup %}
+<div style="padding:16px;background:var(--bg2)">
+  {% block popup_content %}{% endblock %}
+  {% block popup_extrascript %}{% endblock %}
+</div>
+{% else %}
+
+<div class="h-layout">
+
+  {# ══════════ SIDEBAR ══════════ #}
+  <aside class="h-sidebar">
+    <a href="{% url 'admin:index' %}" class="h-logo">
+      <div class="h-logo-icon"><i class="ti ti-robot"></i></div>
+      <div class="h-logo-text">
+        <div class="h-logo-name">Habibti</div>
+        <div class="h-logo-sub">Admin Panel</div>
+      </div>
+    </a>
+
+    <nav class="h-nav">
+      {# Dashboard #}
+      <a href="{% url 'admin:index' %}" class="h-nav-item {% if request.path == '/admin/' %}active{% endif %}">
+        <i class="ti ti-layout-dashboard"></i>
+        <span>Dashboard</span>
+      </a>
+
+      {# App models #}
+      {% for app in available_apps %}
+        <div class="h-nav-section">{{ app.name }}</div>
+        {% for model in app.models %}
+          <a href="{{ model.admin_url }}"
+             class="h-nav-item {% if model.admin_url in request.path %}active{% endif %}">
+            {% with mn=model.object_name|lower %}
+            <i class="ti {% if 'setting' in mn %}ti-settings{% elif 'owner' in mn or 'egasi' in mn %}ti-crown{% elif 'admin' in mn %}ti-user-cog{% elif 'stat' in mn %}ti-chart-bar{% elif 'warn' in mn %}ti-alert-triangle{% elif 'ban' in mn %}ti-shield-lock{% elif 'user' in mn %}ti-users{% elif 'broadcast' in mn or 'message' in mn %}ti-send{% elif 'bad' in mn or 'word' in mn %}ti-ban{% elif 'rule' in mn %}ti-scroll{% elif 'scheduled' in mn %}ti-clock{% elif 'note' in mn %}ti-note{% elif 'group' in mn %}ti-users-group{% elif 'violation' in mn %}ti-user-x{% elif 'promotion' in mn %}ti-star{% else %}ti-circle{% endif %}"></i>
+            {% endwith %}
+            <span>{{ model.name }}</span>
+          </a>
+        {% endfor %}
+      {% endfor %}
+    </nav>
+
+    <div class="h-bot-status">
+      <div class="h-bot-dot"></div>
+      <div>
+        <div class="h-bot-lbl">Bot ishlayapti</div>
+        <div class="h-bot-sub">Faol</div>
+      </div>
+    </div>
+  </aside>
+
+  {# ══════════ MAIN ══════════ #}
+  <div class="h-main">
+
+    {# TOPBAR #}
+    <header class="h-topbar">
+      <div class="h-breadcrumb">
+        {# Breadcrumbs block from child templates #}
+        {% block breadcrumbs %}
+          <a href="{% url 'admin:index' %}">Bosh sahifa</a>
+          <span class="h-breadcrumb-sep">/</span>
+          <span class="h-breadcrumb-cur">Dashboard</span>
+        {% endblock %}
+      </div>
+      <div class="h-topbar-right">
+        <a href="{% url 'admin:index' %}" class="h-icon-btn" title="Dashboard">
+          <i class="ti ti-home"></i>
+        </a>
+        {% if user.is_active and user.is_staff %}
+        <div class="h-user-btn">
+          <div class="h-user-ava">
+            {{ request.user.username|slice:":2"|upper }}
+          </div>
+          <div>
+            <div class="h-user-name">{{ request.user.get_short_name|default:request.user.username }}</div>
+            <div class="h-user-role">{% if request.user.is_superuser %}Superadmin{% else %}Admin{% endif %}</div>
+          </div>
+        </div>
+        <a href="{% url 'admin:logout' %}" class="h-icon-btn" title="Chiqish">
+          <i class="ti ti-logout"></i>
+        </a>
+        {% endif %}
+      </div>
+    </header>
+
+    {# CONTENT #}
+    <div class="h-content">
+
+      {# Django messages #}
+      {% if messages %}
+      <ul class="messagelist">
+        {% for message in messages %}
+        <li class="{{ message.tags }}">{{ message }}</li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+
+      {# Content title #}
+      {% block content_title %}{% endblock %}
+
+      {# Object tools (Add button etc.) #}
+      {% block object-tools %}{% endblock %}
+
+      {# Main content from child templates #}
+      {% block content %}{% endblock %}
+
+      {# Right sidebar (filters) #}
+      {% block sidebar %}{% endblock %}
+
+    </div>{# /h-content #}
+  </div>{# /h-main #}
+</div>{# /h-layout #}
+{% endif %}{# is_popup #}
+
+{# Django admin required scripts #}
+<script src="{% url 'admin:jsi18n' %}"></script>
+{% block extrascript %}{% endblock %}
+
+<script>
+/* Auto-mark active nav items based on current URL */
+const path = window.location.pathname;
+document.querySelectorAll('.h-nav-item').forEach(a => {
+  const href = a.getAttribute('href');
+  if (href && href !== '/admin/' && path.startsWith(href)) {
+    document.querySelectorAll('.h-nav-item').forEach(i => i.classList.remove('active'));
+    a.classList.add('active');
+  }
+});
+</script>
+
+</body>
+</html>
