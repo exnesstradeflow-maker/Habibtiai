@@ -565,7 +565,7 @@ p.datetime { display: flex; gap: 8px; color: var(--txt2); font-size: 13px; }
 {# Popup window — minimal layout #}
 {% if is_popup %}
 <div style="padding:16px;background:var(--bg2)">
-  {% block content %}{% endblock %}
+  {% block popup_content %}{% endblock %}
   {% block extrascript %}{% endblock %}
 </div>
 {% else %}
