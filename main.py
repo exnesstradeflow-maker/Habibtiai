@@ -2,6 +2,7 @@ import os
 import sys
 import io
 import re
+import html
 import base64
 import random
 import asyncio
@@ -15,6 +16,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
+from aiogram.exceptions import TelegramRetryAfter
 from moderator import MOD
 from asgiref.sync import sync_to_async
 import dj_database_url
@@ -202,6 +204,12 @@ class BotSetting(models.Model):
         "Ogohlantirish limiti (ban oldin)",
         default=3,
         help_text="Nechta ogohlantirishdan keyin foydalanuvchi banlansin (default: 3)."
+    )
+    # ── /sutag (hammani tag qilish) ─────────────────────────────────────
+    sutag_admin_only = models.BooleanField(
+        "Tag (/sutag): faqat adminlar ishlatsinmi?",
+        default=True,
+        help_text="Yoqilsa — /sutag ni faqat bot/guruh adminlari ishlata oladi. O'chirilsa — guruhdagi hamma ishlata oladi."
     )
 
     class Meta:
@@ -794,7 +802,7 @@ if not admin.site.is_registered(BotSetting):
     @admin.register(BotSetting)
     class BotSettingAdmin(admin.ModelAdmin):
         list_display = ('__str__', 'is_captcha_active', 'is_anti_link', 'is_flood_active',
-                        'is_welcome_active', 'is_media_filter_active', 'warn_limit')
+                        'is_welcome_active', 'is_media_filter_active', 'warn_limit', 'sutag_admin_only')
         fieldsets = (
             ("⚙️ Asosiy Sozlamalar", {
                 'fields': ('is_captcha_active', 'is_link_active', 'is_join_request_active',
@@ -811,6 +819,16 @@ if not admin.site.is_registered(BotSetting):
             }),
             ("⚠️ Ogohlantirish Tizimi", {
                 'fields': ('warn_limit',),
+            }),
+            ("🏷 Hammani Tag Qilish (/sutag)", {
+                'fields': ('sutag_admin_only',),
+                'description': (
+                    '<p style="color:#ffd700; font-size:13px;">'
+                    '🏷 /sutag — guruhdagi barcha a\'zolarni ismi bilan birma-bir tag qiladi.<br>'
+                    '⛔ To\'xtatish: <code>/stutag</code> (har doim adminlarga ruxsat bor).<br>'
+                    '✅ Yoqilsa (belgilansa) — faqat adminlar ishlatadi. ❌ O\'chirilsa — guruhdagi hamma ishlata oladi.'
+                    '</p>'
+                ),
             }),
         )
 
@@ -1547,6 +1565,7 @@ def get_bot_settings_status():
                 "media_filter": False, "warn_limit": 3,
                 "flood_limit": 5, "flood_window": 10, "flood_mute": 300,
                 "welcome_text": "👋 Salom, {name}! Guruhga xush kelibsiz! 🎉",
+                "sutag_admin_only": True,
             }
         return {
             "captcha":      s.is_captcha_active,
@@ -1563,6 +1582,7 @@ def get_bot_settings_status():
             "flood_window": s.flood_window,
             "flood_mute":   s.flood_mute_seconds,
             "welcome_text": s.welcome_text,
+            "sutag_admin_only": s.sutag_admin_only,
         }
     except Exception:
         return {
@@ -1572,6 +1592,7 @@ def get_bot_settings_status():
             "media_filter": False, "warn_limit": 3,
             "flood_limit": 5, "flood_window": 10, "flood_mute": 300,
             "welcome_text": "👋 Salom, {name}! Guruhga xush kelibsiz! 🎉",
+            "sutag_admin_only": True,
         }
 
 @sync_to_async
@@ -1867,6 +1888,39 @@ def get_full_stats() -> dict:
         return {'users': 0, 'bans': 0, 'warns': 0,
                 'users_with_warns': 0, 'links': 0, 'captcha': 0, 'blocked': 0}
 
+
+@sync_to_async
+def get_group_roster() -> list:
+    """
+    /sutag uchun: guruhda kamida bir marta yozgan barcha a'zolarning
+    ro'yxatini (user_id, eng so'nggi ismi/username) qaytaradi.
+    Telegram bot API orqali "guruh a'zolari" ro'yxatini to'liq olishning
+    iloji yo'q, shuning uchun GroupActivity jadvali (xabar yozganlar)
+    asosida tuzilgan ro'yxat ishlatiladi. Hafli (permanent ban) userlar
+    chiqarib tashlanadi.
+    """
+    try:
+        banned_ids = set(BannedUser.objects.values_list('user_id', flat=True))
+        roster = {}
+        rows = (
+            GroupActivity.objects
+            .order_by('-date')
+            .values('user_id', 'first_name', 'username')
+        )
+        for r in rows:
+            uid = r['user_id']
+            if uid in banned_ids or uid in roster:
+                continue
+            roster[uid] = {
+                'user_id': uid,
+                'first_name': r['first_name'] or f"ID:{uid}",
+                'username': r['username'] or "",
+            }
+        return list(roster.values())
+    except Exception as e:
+        logger.error(f"Guruh ro'yxatini olishda xatolik: {e}")
+        return []
+
 # =====================================================================
 # 9. BOT INSTANCELARI
 # =====================================================================
@@ -1886,6 +1940,10 @@ _main_loop: asyncio.AbstractEventLoop | None = None
 # ── Flood nazorati uchun xotira ───────────────────────────────────────
 # { user_id: deque([timestamp1, timestamp2, ...]) }
 _flood_tracker: dict[int, deque] = defaultdict(lambda: deque())
+
+# ── /sutag uchun: hozir davom etayotgan tag jarayonlari ────────────────
+# { chat_id: {"active": bool, "started_by": user_id} }
+_sutag_jobs: dict[int, dict] = {}
 
 # =====================================================================
 # 10. YORDAMCHI FUNKSIYALAR
@@ -2723,6 +2781,13 @@ async def _build_panel(user_id: int):
         icon = "✅" if val else "❌"
         return InlineKeyboardButton(text=f"{icon} {label}", callback_data=f"pnl_t_{code}")
 
+    sutag_admin_only = settings.get('sutag_admin_only', True)
+    sutag_mode_label  = "👮 Faqat admin" if sutag_admin_only else "👥 Hammaga ochiq"
+    sutag_btn = InlineKeyboardButton(
+        text=f"🏷 Tag (/sutag): {sutag_mode_label}",
+        callback_data="pnl_t_tag"
+    )
+
     text = (
         "🎛 <b>⚜ Mafia Habibiti — Boshqaruv Paneli</b>\n"
         "━━━━━━━━━━━━━━━━━━━━\n\n"
@@ -2744,7 +2809,9 @@ async def _build_panel(user_id: int):
         f"{bi(settings['anti_link'])} Anti-link\n"
         f"{bi(settings['welcome'])} Xush kelibsiz  "
         f"{bi(settings['media_filter'])} Media filter\n"
-        f"⚠️ Warn limiti: <b>{settings.get('warn_limit', 3)}</b> ta\n"
+        f"⚠️ Warn limiti: <b>{settings.get('warn_limit', 3)}</b> ta\n\n"
+        "🏷 <b>Tag (/sutag):</b> ishlatadiganlar — "
+        f"<b>{sutag_mode_label}</b>\n"
         "━━━━━━━━━━━━━━━━━━━━"
     )
     markup = InlineKeyboardMarkup(inline_keyboard=[
@@ -2766,6 +2833,7 @@ async def _build_panel(user_id: int):
             tog_btn("wlc", settings['welcome'],      "👋 Xush kelibsiz"),
             tog_btn("mfl", settings['media_filter'], "🚫 Media filter"),
         ],
+        [sutag_btn],
         [
             InlineKeyboardButton(text="👑 Adminlar",         callback_data="pnl_adm"),
             InlineKeyboardButton(text="🚫 Banlar",           callback_data="pnl_ban"),
@@ -2811,6 +2879,7 @@ _FIELD_MAP = {
     "alk": "is_anti_link",
     "wlc": "is_welcome_active",
     "mfl": "is_media_filter_active",
+    "tag": "sutag_admin_only",
 }
 
 @dp.callback_query(F.data.startswith("pnl_"))
@@ -2848,11 +2917,15 @@ async def pnl_callback_handler(callback: CallbackQuery):
             "alk": "🔗 Anti-link",     "wlc": "👋 Xush kelibsiz",
             "mfl": "🚫 Media filter",
         }
-        lbl = label_map.get(code, code)
-        await callback.answer(
-            f"{'✅ Yoqildi' if new_val else '❌ O\'chirildi'}: {lbl}",
-            show_alert=True
-        )
+        if code == "tag":
+            mode_text = "👮 Endi /sutag faqat ADMINLAR uchun" if new_val else "👥 Endi /sutag HAMMAGA ochiq"
+            await callback.answer(mode_text, show_alert=True)
+        else:
+            lbl = label_map.get(code, code)
+            await callback.answer(
+                f"{'✅ Yoqildi' if new_val else '❌ O\'chirildi'}: {lbl}",
+                show_alert=True
+            )
         # Panelni yangilash
         text, markup = await _build_panel(user_id)
         try:
@@ -2928,6 +3001,123 @@ async def pnl_callback_handler(callback: CallbackQuery):
 
     else:
         await callback.answer("❓ Noma'lum amal.")
+
+
+# ─────────────────────────────────────────────────────────────────────
+# /sutag — guruhning barcha (ma'lum) a'zolarini ismi bilan, alohida-
+#          alohida tag qiladi. /stutag — jarayonni to'xtatadi.
+# ─────────────────────────────────────────────────────────────────────
+SUTAG_RANDOM_PHRASES = [
+    "🌙 Tun tushdi... Mafia o'yini boshlanmoqda, hammasi shoshilsin!",
+    "🎭 Niqoblaringizni kiying — o'yin boshlanish arafasida!",
+    "🔪 Komissar barchani stol atrofiga chaqiryapti!",
+    "🕵️ Shubhalilar yig'ilsin! Mafia Habibiti chaqiryapti!",
+    "⚜️ Mafia Habibiti e'lon qiladi: barchasi join bo'lsin!",
+    "🃏 Qartalar tarqatildi... O'yinga tayyor bo'ling!",
+    "🌑 Shahar uxlamoqda... lekin Mafia uyg'oq! Hammasi keling!",
+    "📯 E'lon: o'yin boshlanmoqda, hech kim chetda qolmasin!",
+]
+
+SUTAG_BATCH_SIZE  = 6     # bitta xabarda nechta odam tag qilinsin
+SUTAG_BATCH_DELAY = 1.5   # batchlar orasidagi kutish (soniya) — Telegram flood-dan saqlaydi
+
+
+@dp.message(F.chat.id == MAIN_CHAT_ID, F.text.regexp(r'(?s)^/sutag(?:@\w+)?(?:\s+(.+))?$'))
+async def cmd_sutag(message: types.Message):
+    """Guruhning barcha a'zolarini ismi bilan, alohida-alohida tag qiladi."""
+    user_id = message.from_user.id
+    chat_id = message.chat.id
+
+    settings = await get_bot_settings_status()
+    if settings.get("sutag_admin_only", True):
+        if not (await is_bot_admin(user_id) or await is_admin(chat_id, user_id)):
+            return await message.reply("⛔ Bu buyruqni faqat adminlar ishlata oladi.")
+
+    if _sutag_jobs.get(chat_id, {}).get("active"):
+        return await message.reply(
+            "⚠️ Hozir tag jarayoni davom etmoqda.\n🛑 To'xtatish uchun: /stutag"
+        )
+
+    m = re.match(r'(?s)^/sutag(?:@\w+)?(?:\s+(.+))?$', message.text)
+    custom_text = (m.group(1) or "").strip() if m else ""
+    header = html.escape(custom_text, quote=False) if custom_text else random.choice(SUTAG_RANDOM_PHRASES)
+
+    roster = await get_group_roster()
+    if not roster:
+        return await message.reply(
+            "📭 Hozircha hech kim aniqlanmadi.\n"
+            "ℹ️ Bot faqat guruhda kamida bitta xabar yozgan a'zolarni eslab qoladi — "
+            "Telegram Bot API orqali to'liq a'zolar ro'yxatini olishning iloji yo'q."
+        )
+
+    _sutag_jobs[chat_id] = {"active": True, "started_by": user_id}
+    total       = len(roster)
+    sent_count  = 0
+    stopped_early = False
+
+    await message.reply(
+        f"🏷 <b>Tag boshlandi</b> — {total} a'zo.\n🛑 To'xtatish: /stutag",
+        parse_mode="HTML"
+    )
+
+    try:
+        for i in range(0, total, SUTAG_BATCH_SIZE):
+            if not _sutag_jobs.get(chat_id, {}).get("active"):
+                stopped_early = True
+                break
+            batch = roster[i:i + SUTAG_BATCH_SIZE]
+            lines = [f"📣 <b>{header}</b>", ""]
+            for u in batch:
+                safe_name = html.escape(u["first_name"], quote=False)
+                lines.append(f"👤 <a href=\"tg://user?id={u['user_id']}\">{safe_name}</a>")
+            text = "\n".join(lines)
+            try:
+                await bot.send_message(chat_id, text, parse_mode="HTML")
+                sent_count += len(batch)
+            except TelegramRetryAfter as e:
+                await asyncio.sleep(e.retry_after + 1)
+                try:
+                    await bot.send_message(chat_id, text, parse_mode="HTML")
+                    sent_count += len(batch)
+                except Exception as e2:
+                    logger.error(f"/sutag batch yuborishda xatolik (retry): {e2}")
+            except Exception as e:
+                logger.error(f"/sutag batch yuborishda xatolik: {e}")
+            await asyncio.sleep(SUTAG_BATCH_DELAY)
+    finally:
+        _sutag_jobs.pop(chat_id, None)
+
+    if not stopped_early:
+        try:
+            await bot.send_message(
+                chat_id,
+                f"✅ Tag yakunlandi — <b>{sent_count}/{total}</b> kishi taglandi.",
+                parse_mode="HTML"
+            )
+        except Exception:
+            pass
+
+
+@dp.message(F.chat.id == MAIN_CHAT_ID, F.text.regexp(r'^/stutag(?:@\w+)?$'))
+async def cmd_stutag(message: types.Message):
+    """Davom etayotgan /sutag jarayonini to'xtatadi."""
+    user_id = message.from_user.id
+    chat_id = message.chat.id
+    job = _sutag_jobs.get(chat_id)
+
+    if not job or not job.get("active"):
+        return await message.reply("ℹ️ Hozir faol tag jarayoni yo'q.")
+
+    allowed = (
+        user_id == job.get("started_by")
+        or await is_bot_admin(user_id)
+        or await is_admin(chat_id, user_id)
+    )
+    if not allowed:
+        return await message.reply("⛔ Faqat boshlagan odam yoki adminlar to'xtatishi mumkin.")
+
+    job["active"] = False
+    await message.reply("🛑 Tag jarayoni to'xtatildi.")
 
 
 # ─────────────────────────────────────────────────────────────────────
